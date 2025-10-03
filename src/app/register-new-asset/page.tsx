@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,12 +17,112 @@ import {
 } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
 import { assetSchema, type AssetFormData } from "@/lib/validations";
+import { useCreateAssetMutation } from "@/features/dashboard/assets/services/mutations";
+import type { CreateAssetRequest } from "@/features/dashboard/assets/type";
+import { useCategoriesQuery } from "@/features/dashboard/category/services/queries";
+import { useDepartmentsQuery } from "@/features/dashboard/departments/services/queries";
+import { useBranches } from "@/features/dashboard/branches/services/queries";
+import { useSuppliersQuery } from "@/features/dashboard/supplier/services/queries";
 import { ArrowLeft, Save, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  SearchableSelect,
+  SearchableSelectOption,
+} from "@/components/ui/searchable-select";
+import {
+  Contact,
+  useContactsQuery,
+} from "@/features/dashboard/admin-management";
 
 export default function RegisterNewAssetPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const createAssetMutation = useCreateAssetMutation();
+
+  const sanitizeCustodianName = (name: string) => {
+    const cleaned = name
+      .replace(/[^a-zA-Z\s'.-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned;
+  };
+
+  // Search states for each resource type
+  const [categorySearch, setCategorySearch] = useState("");
+  const [departmentSearch, setDepartmentSearch] = useState("");
+  const [branchSearch, setBranchSearch] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
+
+  // Selected values state
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState("");
+
+  // Debounced search states
+  const [categorySearchTerm, setCategorySearchTerm] = useState("");
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [branchSearchTerm, setBranchSearchTerm] = useState("");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+
+  // Debounce search terms (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCategorySearchTerm(categorySearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [categorySearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDepartmentSearchTerm(departmentSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [departmentSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBranchSearchTerm(branchSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [branchSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSupplierSearchTerm(supplierSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [supplierSearch]);
+
+  // API calls for dropdown data with search support
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useCategoriesQuery(
+    categorySearchTerm ? { searchKey: categorySearchTerm } : undefined
+  );
+  const {
+    data: departmentsData,
+    isLoading: departmentsLoading,
+    error: departmentsError,
+  } = useDepartmentsQuery(
+    departmentSearchTerm ? { searchKey: departmentSearchTerm } : undefined
+  );
+  const {
+    data: branchesData,
+    isLoading: branchesLoading,
+    error: branchesError,
+  } = useBranches(
+    branchSearchTerm ? { searchKey: branchSearchTerm } : undefined
+  );
+  const {
+    data: suppliersData,
+    isLoading: suppliersLoading,
+    error: suppliersError,
+  } = useSuppliersQuery(
+    supplierSearchTerm ? { searchKey: supplierSearchTerm } : undefined
+  );
 
   const {
     register,
@@ -49,28 +149,83 @@ export default function RegisterNewAssetPage() {
       usefulLife: 5,
       salvageValue: 0,
       t24AssetId: "",
-      custodian: "",
+      // custodian: "",
     },
     mode: "onChange",
   });
+
+  const transformFormDataToApiRequest = (
+    data: AssetFormData
+  ): CreateAssetRequest => {
+    const custodianName = sanitizeCustodianName(
+      selectedContact?.name ?? data.custodian
+    );
+    return {
+      assetName: data.assetName,
+      serialNumber: data.serialNumber,
+      tagNumber: data.serialNumber,
+      categoryGuid: data.assetCategory,
+      departmentGuid: data.department,
+      branchGuid: data.branch,
+      supplierGuid: data.supplier,
+      acquisitionDate: data.acquisitionDate,
+      acquisitionCost: data.acquisitionCost,
+      currentBookValue: data.acquisitionCost,
+      locationDetail: data.locationDetail,
+      condition: data.condition,
+      status: "active",
+      depreciationMethod: data.depreciationMethod,
+      usefulLifeYears: data.usefulLife,
+      salvageValue: data.salvageValue,
+      t24AssetReference: data.t24AssetId,
+      lastT24ValuationDate: new Date().toISOString(),
+      custodian: custodianName,
+    };
+  };
+
+  const [contactSearchTerm, setContactSearchTerm] = useState("");
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+
+  const handleContactSearch = (search: string) => {
+    setContactSearchTerm(search);
+  };
+  const { data: contactsData, isLoading: contactsLoading } = useContactsQuery(
+    contactSearchTerm ? { search: contactSearchTerm } : undefined
+  );
+  const contacts = contactsData?.responseData?.records || [];
+
+  const contactOptions: SearchableSelectOption[] = contacts.map(
+    (contact: Contact) => ({
+      value: contact.email,
+      label: contact.name,
+      description: `${contact.email} • ${contact.username}`,
+    })
+  );
 
   const onSubmit = async (data: AssetFormData) => {
     setIsLoading(true);
     clearErrors();
 
     try {
-      // Simulate API call - replace with actual asset creation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const apiRequest = transformFormDataToApiRequest(data);
 
-      console.log("Asset data:", data);
+      console.log("apiRequest", apiRequest);
+      const res = await createAssetMutation.mutateAsync(apiRequest);
 
-      toast.success("Asset registered successfully!", {
-        description: `${data.assetName} has been added to the system.`,
-      });
+      console.log(res);
 
-      // Redirect to asset list or dashboard
-      router.push("/dashboard");
-    } catch {
+      if (res.responseCode === "00") {
+        toast.success("Asset registered successfully!", {
+          description: `${data.assetName} has been added to the system.`,
+        });
+        router.push("/all-asset-list");
+      } else {
+        toast.error("Failed to register asset", {
+          description: "Please check your data and try again.",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create asset:", error);
       toast.error("Failed to register asset", {
         description: "Please check your data and try again.",
       });
@@ -83,36 +238,36 @@ export default function RegisterNewAssetPage() {
     router.back();
   };
 
-  // Mock data for dropdowns - replace with actual API calls
-  const assetCategories = [
-    { value: "computer-equipment", label: "Computer Equipment" },
-    { value: "office-furniture", label: "Office Furniture" },
-    { value: "vehicles", label: "Vehicles" },
-    { value: "machinery", label: "Machinery" },
-    { value: "building-equipment", label: "Building Equipment" },
-  ];
+  // Transform API data to SearchableSelectOption format with GUIDs as values
+  const assetCategories: SearchableSelectOption[] =
+    categoriesData?.responseData?.records?.map((category) => ({
+      value: category.guid,
+      label: category.categoryName,
+      description: category.description || undefined,
+    })) || [];
 
-  const departments = [
-    { value: "finance", label: "Finance" },
-    { value: "hr", label: "Human Resources" },
-    { value: "it", label: "Information Technology" },
-    { value: "operations", label: "Operations" },
-    { value: "marketing", label: "Marketing" },
-  ];
+  const departments: SearchableSelectOption[] =
+    departmentsData?.responseData?.records?.map((department) => ({
+      value: department.guid,
+      label: department.departmentName,
+      description: department.description || undefined,
+    })) || [];
 
-  const branches = [
-    { value: "head-office", label: "Head Office" },
-    { value: "branch-1", label: "Branch 1 - Downtown" },
-    { value: "branch-2", label: "Branch 2 - Uptown" },
-    { value: "branch-3", label: "Branch 3 - Westside" },
-  ];
+  const branches: SearchableSelectOption[] =
+    branchesData?.responseData?.records?.map((branch) => ({
+      value: branch.guid,
+      label: branch.branchName,
+      description: branch.address || branch.description || undefined,
+    })) || [];
 
-  const suppliers = [
-    { value: "supplier-1", label: "TechCorp Solutions" },
-    { value: "supplier-2", label: "Office Plus Ltd" },
-    { value: "supplier-3", label: "Industrial Supply Co" },
-    { value: "supplier-4", label: "Modern Furniture Inc" },
-  ];
+  const suppliers: SearchableSelectOption[] =
+    suppliersData?.responseData?.records?.map((supplier) => ({
+      value: supplier.guid,
+      label: supplier.supplierName,
+      description: supplier.contactPerson
+        ? `${supplier.contactPerson} • ${supplier.contactNumber || ""}`
+        : supplier.description || undefined,
+    })) || [];
 
   const conditions = [
     { value: "excellent", label: "Excellent" },
@@ -131,7 +286,6 @@ export default function RegisterNewAssetPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-100/50">
-      {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-orange-200/50 sticky top-0 z-40">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -157,10 +311,8 @@ export default function RegisterNewAssetPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Page Title */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Add New Fixed Asset
@@ -170,7 +322,6 @@ export default function RegisterNewAssetPage() {
             </p>
           </div>
 
-          {/* Form */}
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -183,7 +334,6 @@ export default function RegisterNewAssetPage() {
 
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-                {/* Basic Information */}
                 <div className="grid gap-6 md:grid-cols-2">
                   <FormField
                     label="Asset Name"
@@ -204,33 +354,25 @@ export default function RegisterNewAssetPage() {
                   />
                 </div>
 
-                {/* Category and Date */}
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium required">
                       Asset Category <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      onValueChange={(value) =>
-                        setValue("assetCategory", value)
-                      }
-                    >
-                      <SelectTrigger
-                        className={errors.assetCategory ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select asset category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {assetCategories.map((category) => (
-                          <SelectItem
-                            key={category.value}
-                            value={category.value}
-                          >
-                            {category.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={assetCategories}
+                      value={selectedCategory}
+                      onValueChange={(value) => {
+                        setSelectedCategory(value);
+                        setValue("assetCategory", value);
+                      }}
+                      onSearchChange={setCategorySearch}
+                      placeholder="Search and select category..."
+                      emptyMessage="No categories found. Try a different search."
+                      loading={categoriesLoading}
+                      disabled={!!categoriesError}
+                      clearable
+                    />
                     {errors.assetCategory && (
                       <p className="text-xs text-red-600 flex items-center mt-1">
                         <AlertCircle className="w-3 h-3 mr-1" />
@@ -249,7 +391,6 @@ export default function RegisterNewAssetPage() {
                   />
                 </div>
 
-                {/* Cost and Financial */}
                 <div className="grid gap-6 md:grid-cols-3">
                   <FormField
                     label="Acquisition Cost"
@@ -282,28 +423,25 @@ export default function RegisterNewAssetPage() {
                   />
                 </div>
 
-                {/* Location Information */}
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium required">
                       Department/Unit <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      onValueChange={(value) => setValue("department", value)}
-                    >
-                      <SelectTrigger
-                        className={errors.department ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.value} value={dept.value}>
-                            {dept.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={departments}
+                      value={selectedDepartment}
+                      onValueChange={(value) => {
+                        setSelectedDepartment(value);
+                        setValue("department", value);
+                      }}
+                      onSearchChange={setDepartmentSearch}
+                      placeholder="Search and select department..."
+                      emptyMessage="No departments found. Try a different search."
+                      loading={departmentsLoading}
+                      disabled={!!departmentsError}
+                      clearable
+                    />
                     {errors.department && (
                       <p className="text-xs text-red-600 flex items-center mt-1">
                         <AlertCircle className="w-3 h-3 mr-1" />
@@ -316,22 +454,20 @@ export default function RegisterNewAssetPage() {
                     <Label className="text-sm font-medium required">
                       Branch <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      onValueChange={(value) => setValue("branch", value)}
-                    >
-                      <SelectTrigger
-                        className={errors.branch ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select branch" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.value} value={branch.value}>
-                            {branch.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={branches}
+                      value={selectedBranch}
+                      onValueChange={(value) => {
+                        setSelectedBranch(value);
+                        setValue("branch", value);
+                      }}
+                      onSearchChange={setBranchSearch}
+                      placeholder="Search and select branch..."
+                      emptyMessage="No branches found. Try a different search."
+                      loading={branchesLoading}
+                      disabled={!!branchesError}
+                      clearable
+                    />
                     {errors.branch && (
                       <p className="text-xs text-red-600 flex items-center mt-1">
                         <AlertCircle className="w-3 h-3 mr-1" />
@@ -350,31 +486,25 @@ export default function RegisterNewAssetPage() {
                   {...register("locationDetail")}
                 />
 
-                {/* Supplier and Warranty */}
                 <div className="grid gap-6 md:grid-cols-3">
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-2">
                     <Label className="text-sm font-medium required">
                       Supplier <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      onValueChange={(value) => setValue("supplier", value)}
-                    >
-                      <SelectTrigger
-                        className={errors.supplier ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select supplier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem
-                            key={supplier.value}
-                            value={supplier.value}
-                          >
-                            {supplier.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={suppliers}
+                      value={selectedSupplier}
+                      onValueChange={(value) => {
+                        setSelectedSupplier(value);
+                        setValue("supplier", value);
+                      }}
+                      onSearchChange={setSupplierSearch}
+                      placeholder="Search and select supplier..."
+                      emptyMessage="No suppliers found. Try a different search."
+                      loading={suppliersLoading}
+                      disabled={!!suppliersError}
+                      clearable
+                    />
                     {errors.supplier && (
                       <p className="text-xs text-red-600 flex items-center mt-1">
                         <AlertCircle className="w-3 h-3 mr-1" />
@@ -402,7 +532,6 @@ export default function RegisterNewAssetPage() {
                   />
                 </div>
 
-                {/* Condition and Depreciation */}
                 <div className="grid gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium required">
@@ -477,7 +606,6 @@ export default function RegisterNewAssetPage() {
                   </div>
                 </div>
 
-                {/* Additional Information */}
                 <div className="grid gap-6 md:grid-cols-2">
                   <FormField
                     label="T24 Asset ID"
@@ -489,18 +617,43 @@ export default function RegisterNewAssetPage() {
                     description="Used for integration with T24 banking system"
                   />
 
-                  <FormField
-                    label="Custodian"
-                    placeholder="Enter custodian name"
-                    error={errors.custodian}
-                    touched={touchedFields.custodian}
-                    required
-                    {...register("custodian")}
-                    description="Person responsible for this asset"
-                  />
+                  <div className="flex flex-col">
+                    <p>Custodian</p>
+                    <SearchableSelect
+                      options={contactOptions}
+                      value={selectedContact?.email || ""}
+                      onValueChange={(value) => {
+                        const contact = contacts.find(
+                          (c: Contact) => c.email === value
+                        );
+                        setSelectedContact(contact || null);
+                        setValue(
+                          "custodian",
+                          sanitizeCustodianName(contact?.name ?? ""),
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+                        if (contact?.name) {
+                          clearErrors("custodian");
+                        }
+                      }}
+                      onSearchChange={handleContactSearch}
+                      placeholder="Search and select a contact..."
+                      emptyMessage="No contacts found. Try adjusting your search."
+                      loading={contactsLoading}
+                      clearable={true}
+                    />
+                    {errors.custodian && (
+                      <p className="text-xs text-red-600 flex items-center mt-1">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        {errors.custodian.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Form Summary Errors */}
                 {Object.keys(errors).length > 0 && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-center space-x-2 mb-2">
@@ -517,13 +670,12 @@ export default function RegisterNewAssetPage() {
                   </div>
                 )}
 
-                {/* Action Buttons */}
                 <div className="flex items-center justify-end space-x-4 pt-6 border-t">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleCancel}
-                    disabled={isLoading}
+                    disabled={isLoading || createAssetMutation.isPending}
                     className="flex items-center space-x-2"
                   >
                     <X className="h-4 w-4" />
@@ -536,10 +688,13 @@ export default function RegisterNewAssetPage() {
                     disabled={
                       isLoading ||
                       isSubmitting ||
+                      createAssetMutation.isPending ||
                       Object.keys(errors).length > 0
                     }
                   >
-                    {isLoading || isSubmitting ? (
+                    {isLoading ||
+                    isSubmitting ||
+                    createAssetMutation.isPending ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         <span>Saving Asset...</span>
