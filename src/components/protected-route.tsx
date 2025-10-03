@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/features/auth";
+import { useAuthStore } from "@/features/auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { LogoCompact } from "@/components/ui/logo";
@@ -14,7 +14,7 @@ export function ProtectedRoute({
   children,
   redirectTo = "/login",
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isHydrated } = useAuth();
+  const { isAuthenticated, isHydrated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
