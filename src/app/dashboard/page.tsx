@@ -1,17 +1,29 @@
 "use client";
 
-import { useAuth } from "@/features/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
+import { useCategoryAssetsCountQuery } from "@/features/dashboard/category/services/queries";
 import { useAuthStore } from "@/features/auth";
 import { useRouter } from "next/navigation";
-import { BarChart3, LogOut, FileText, History, List, Plus } from "lucide-react";
+import {
+  BarChart3,
+  LogOut,
+  FileText,
+  History,
+  List,
+  Plus,
+  Settings,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
-  const { isAuthenticated, isHydrated } = useAuth();
-  const { logout } = useAuthStore();
+  const { data: categoryMetrics, isLoading: categoryMetricsLoading } =
+    useCategoryAssetsCountQuery();
+  const { isAuthenticated, isHydrated } = useAuthStore();
+  const { logout, user } = useAuthStore();
+
   const router = useRouter();
 
   // Redirect to login if not authenticated (after hydration)
@@ -80,14 +92,34 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 text-gray-500">
+              <div className="font-semibold text-xs">
+                <p className="">{user?.fullName}</p>
+                <p>{user?.emailAddress}</p>
+              </div>
+
               <Button
-                variant="outline"
-                onClick={handleLogout}
-                className="flex items-center space-x-2"
+                onClick={() => router.push("/admin-management")}
+                className="flex items-center border-blue-500 border space-x-2 hover:bg-blue-50"
               >
-                <LogOut className="h-4 w-4" />
-                <span>Logout</span>
+                <Users className="text-blue-500 h-4 w-4" />
+                <span className="text-blue-500">Manage Users</span>
+              </Button>
+
+              <Button
+                onClick={() => router.push("/manage-resources")}
+                className="flex items-center border-orange-500 border space-x-2 hover:bg-orange-50"
+              >
+                <Settings className="text-orange-500 h-4 w-4" />
+                <span className="text-orange-500">Manage Resources</span>
+              </Button>
+
+              <Button
+                onClick={handleLogout}
+                className="flex items-center border-red-500 border space-x-2"
+              >
+                <LogOut className="text-red-500 h-4 w-4" />
+                <span className="text-red-500">Logout</span>
               </Button>
             </div>
           </div>
@@ -167,102 +199,70 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Asset Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[
-                  {
-                    action: "Added",
-                    asset: "Dell Laptop #DL-2024-001",
-                    time: "2 hours ago",
-                    type: "add",
-                  },
-                  {
-                    action: "Updated",
-                    asset: "Office Printer #HP-001",
-                    time: "4 hours ago",
-                    type: "update",
-                  },
-                  {
-                    action: "Maintenance",
-                    asset: "Conference Table #CT-15",
-                    time: "1 day ago",
-                    type: "maintenance",
-                  },
-                  {
-                    action: "Disposed",
-                    asset: "Old Server #SV-2019-08",
-                    time: "2 days ago",
-                    type: "dispose",
-                  },
-                ].map((activity, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center space-x-4 p-3 rounded-lg bg-gray-50"
-                  >
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        activity.type === "add"
-                          ? "bg-green-500"
-                          : activity.type === "update"
-                          ? "bg-blue-500"
-                          : activity.type === "maintenance"
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
-                      }`}
-                    ></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        <span className="text-muted-foreground">
-                          {activity.action}
-                        </span>{" "}
-                        {activity.asset}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.time}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
+        <div className="grid grid-cols-1  gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Asset Categories</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[
-                  { category: "IT Equipment", count: 1247, percentage: 44 },
-                  { category: "Furniture", count: 856, percentage: 30 },
-                  { category: "Vehicles", count: 425, percentage: 15 },
-                  { category: "Machinery", count: 319, percentage: 11 },
-                ].map((item, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">
-                        {item.category}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {item.count} assets
-                      </span>
+              {categoryMetricsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="h-3 w-40 bg-gray-200 rounded animate-pulse" />
+                        <div className="h-3 w-20 bg-gray-200 rounded animate-pulse" />
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-gray-300 h-2 rounded-full w-1/2 animate-pulse" />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-orange-500 to-orange-600 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${item.percentage}%` }}
-                      ></div>
-                    </div>
+                  ))}
+                </div>
+              ) : (categoryMetrics?.responseData?.length ?? 0) > 0 ? (
+                <div className="space-y-4">
+                  {(() => {
+                    const items = categoryMetrics?.responseData || [];
+                    const total =
+                      items.reduce((sum, i) => sum + (i.count || 0), 0) || 1;
+                    return items.map((item, index) => {
+                      const percentage = Math.round(
+                        ((item.count || 0) / total) * 100
+                      );
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">
+                              {item.assetCategoryName}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {item.count} assets
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-orange-500 to-orange-600 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="mx-auto w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mb-3">
+                    <span className="text-orange-600 font-bold">0</span>
                   </div>
-                ))}
-              </div>
+                  <p className="text-gray-700 font-medium">
+                    No category metrics yet
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Once assets are categorized, their counts will appear here.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

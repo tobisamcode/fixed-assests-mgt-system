@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import type React from "react";
 import { useRouter } from "next/navigation";
 import {
   useReactTable,
@@ -16,6 +17,12 @@ import {
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,15 +42,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/ui/logo";
+import { assetStatuses } from "@/lib/dummy-data";
 import {
-  dummyAssets,
-  assetCategories,
-  assetStatuses,
-  depreciationStatuses,
-  formatCurrency,
-  formatDate,
-  type Asset,
-} from "@/lib/dummy-data";
+  useAssetsQuery,
+  useAssetByGuidQuery,
+} from "@/features/dashboard/assets/services/queries";
+import { useUpdateAssetMutation } from "@/features/dashboard/assets/services/mutations";
+import { Asset as ApiAsset } from "@/features/dashboard/assets/type";
 import {
   exportToCSV,
   formatCurrencyForCSV,
@@ -67,40 +72,299 @@ import {
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  SearchableSelect,
+  SearchableSelectOption,
+} from "@/components/ui/searchable-select";
+import {
+  Contact,
+  useContactsQuery,
+} from "@/features/dashboard/admin-management";
+import { useCategoriesQuery } from "@/features/dashboard/category/services/queries";
+import { Category } from "@/features/dashboard/category/type";
+import { useDepartmentsQuery } from "@/features/dashboard/departments/services/queries";
+import { Department } from "@/features/dashboard/departments/type";
+import { useBranches } from "@/features/dashboard/branches/services/queries";
+import { Branch } from "@/features/dashboard/branches/type";
+import { useSuppliersQuery } from "@/features/dashboard/supplier/services/queries";
+import { Supplier } from "@/features/dashboard/supplier/type";
+
+// Asset interface for the component (compatible with existing table structure)
+interface Asset {
+  id: string;
+  tagNumber: string;
+  assetName: string;
+  serialNumber: string;
+  brandName: string;
+  model: string;
+  osVersion?: string;
+  categoryName: string;
+  categoryDescription: string;
+  departmentName: string;
+  departmentDescription: string;
+  branchName: string;
+  branchAddress: string;
+  branchDescription: string;
+  supplierName: string;
+  supplierContactPerson: string;
+  supplierContactNumber: string;
+  supplierEmail: string;
+  supplierDescription: string;
+  acquisitionDate: string;
+  acquisitionCost: number;
+  currentBookValue: number;
+  depreciationMethod: string;
+  status: "Active" | "Disabled" | "Disposed";
+  condition: string;
+  custodian: string;
+  location: string;
+  depreciationStatus: "Current" | "Fully Depreciated" | "Partially Depreciated";
+}
 
 export default function AllAssetListPage() {
   const router = useRouter();
+
+  const [contactSearchTerm, setContactSearchTerm] = useState("");
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+
+  // Search terms for resources
+  const [categorySearchTerm, setCategorySearchTerm] = useState("");
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [branchSearchTerm, setBranchSearchTerm] = useState("");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+
+  // Selected resource GUIDs for editing
+  const [selectedCategoryGuid, setSelectedCategoryGuid] = useState<string>("");
+  const [selectedDepartmentGuid, setSelectedDepartmentGuid] =
+    useState<string>("");
+  const [selectedBranchGuid, setSelectedBranchGuid] = useState<string>("");
+  const [selectedSupplierGuid, setSelectedSupplierGuid] = useState<string>("");
+
+  const handleContactSearch = (search: string) => {
+    setContactSearchTerm(search);
+  };
+  const { data: contactsData, isLoading: contactsLoading } = useContactsQuery(
+    contactSearchTerm ? { search: contactSearchTerm } : undefined
+  );
+  const contacts = contactsData?.responseData?.records || [];
+
+  // Queries for resources
+  const { data: categoriesData, isLoading: categoriesLoading } =
+    useCategoriesQuery({
+      pageNumber: 1,
+      pageSize: 100,
+      ...(categorySearchTerm.trim() && {
+        searchKey: categorySearchTerm.trim(),
+      }),
+    });
+  const categories = categoriesData?.responseData?.records || [];
+
+  const { data: departmentsData, isLoading: departmentsLoading } =
+    useDepartmentsQuery({
+      pageNumber: 1,
+      pageSize: 100,
+      ...(departmentSearchTerm.trim() && {
+        searchKey: departmentSearchTerm.trim(),
+      }),
+    });
+  const departments = departmentsData?.responseData?.records || [];
+
+  const { data: branchesData, isLoading: branchesLoading } = useBranches({
+    pageNumber: 1,
+    pageSize: 100,
+    ...(branchSearchTerm.trim() && { searchKey: branchSearchTerm.trim() }),
+  });
+  const branches = branchesData?.responseData?.records || [];
+
+  const { data: suppliersData, isLoading: suppliersLoading } =
+    useSuppliersQuery({
+      pageNumber: 1,
+      pageSize: 100,
+      ...(supplierSearchTerm.trim() && {
+        searchKey: supplierSearchTerm.trim(),
+      }),
+    });
+  const suppliers = suppliersData?.responseData?.records || [];
+
+  const contactOptions: SearchableSelectOption[] = contacts.map(
+    (contact: Contact) => ({
+      value: contact.email,
+      label: contact.name,
+      description: `${contact.email} • ${contact.username}`,
+    })
+  );
+
+  // Resource options for searchable selects
+  const categoryOptions: SearchableSelectOption[] = categories.map(
+    (category: Category) => ({
+      value: category.guid,
+      label: category.categoryName,
+      description: category.description || "",
+    })
+  );
+
+  const departmentOptions: SearchableSelectOption[] = departments.map(
+    (department: Department) => ({
+      value: department.guid,
+      label: department.departmentName,
+      description: department.description || "",
+    })
+  );
+
+  const branchOptions: SearchableSelectOption[] = branches.map(
+    (branch: Branch) => ({
+      value: branch.guid,
+      label: branch.branchName,
+      description: branch.address || "",
+    })
+  );
+
+  const supplierOptions: SearchableSelectOption[] = suppliers.map(
+    (supplier: Supplier) => ({
+      value: supplier.guid,
+      label: supplier.supplierName,
+      description: `${supplier.contactPerson || ""} • ${supplier.email || ""}`,
+    })
+  );
+
+  // API calls
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [viewAssetGuid, setViewAssetGuid] = useState<string | null>(null);
+  const [editAssetGuid, setEditAssetGuid] = useState<string | null>(null);
+
+  // Debounce search key to reduce API calls during typing
+  useEffect(() => {
+    const handler = window.setTimeout(() => {
+      setDebouncedSearch(globalFilter);
+    }, 400);
+    return () => window.clearTimeout(handler);
+  }, [globalFilter]);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setPageNumber(1);
+  }, [debouncedSearch]);
+  const {
+    data: assetsData,
+    isLoading: assetsLoading,
+    error: assetsError,
+    isFetching: assetsFetching,
+  } = useAssetsQuery({
+    pageNumber,
+    pageSize,
+    searchKey: debouncedSearch || "",
+  });
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([
     { id: "status", value: "Active" }, // Default to Active assets
   ]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
-  const [globalFilter, setGlobalFilter] = useState("");
 
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("Active");
   const [depreciationFilter, setDepreciationFilter] = useState("All");
 
+  // Map API asset data to component Asset interface
+  const mapApiAssetToAssetFactory =
+    (custodianName: string | undefined) =>
+    (apiAsset: ApiAsset): Asset => {
+      const mapStatus = (
+        s: string | undefined
+      ): "Active" | "Disabled" | "Disposed" => {
+        switch ((s || "").toUpperCase()) {
+          case "ACTIVE":
+            return "Active";
+          case "DISABLED":
+            return "Disabled";
+          case "DISPOSED":
+            return "Disposed";
+          default:
+            return "Active";
+        }
+      };
+      // Determine depreciation status based on current book value vs acquisition cost
+      let depreciationStatus:
+        | "Current"
+        | "Fully Depreciated"
+        | "Partially Depreciated" = "Current";
+      if (apiAsset.currentBookValue <= apiAsset.salvageValue) {
+        depreciationStatus = "Fully Depreciated";
+      } else if (apiAsset.currentBookValue < apiAsset.acquisitionCost) {
+        depreciationStatus = "Partially Depreciated";
+      }
+
+      return {
+        id: apiAsset.guid,
+        tagNumber: apiAsset.tagNumber,
+        assetName: apiAsset.assetName,
+        serialNumber: apiAsset.serialNumber,
+        brandName: apiAsset.brandName || "",
+        model: apiAsset.model || "",
+        osVersion: apiAsset.osVersion || "",
+        categoryName: apiAsset.category?.categoryName || "",
+        categoryDescription: apiAsset.category?.description || "",
+        departmentName: apiAsset.department?.departmentName || "",
+        departmentDescription: apiAsset.department?.description || "",
+        branchName: apiAsset.branch?.branchName || "",
+        branchAddress: apiAsset.branch?.address || "",
+        branchDescription: apiAsset.branch?.description || "",
+        supplierName: apiAsset.supplier?.supplierName || "",
+        supplierContactPerson: apiAsset.supplier?.contactPerson || "",
+        supplierContactNumber: apiAsset.supplier?.contactNumber || "",
+        supplierEmail: apiAsset.supplier?.email || "",
+        supplierDescription: apiAsset.supplier?.description || "",
+        acquisitionDate: apiAsset.acquisitionDate,
+        acquisitionCost: apiAsset.acquisitionCost,
+        currentBookValue: apiAsset.currentBookValue,
+        depreciationMethod: apiAsset.depreciationMethod || "",
+        status: mapStatus(apiAsset.status as unknown as string),
+        condition: apiAsset.condition,
+        custodian: custodianName || "",
+        location: apiAsset.locationDetail,
+        depreciationStatus,
+      };
+    };
+
+  // Transform API data to component data
+  const assets = useMemo<Asset[]>(() => {
+    const records = assetsData?.responseData?.records as ApiAsset[] | undefined;
+    if (!records) return [];
+    const mapApiAssetToAsset = mapApiAssetToAssetFactory(selectedContact?.name);
+    return records.map(mapApiAssetToAsset);
+  }, [assetsData, selectedContact]);
+
+  // Queries for modals (hooks must be at top level)
+  const viewAssetQuery = useAssetByGuidQuery(viewAssetGuid || undefined);
+  const editAssetQuery = useAssetByGuidQuery(editAssetGuid || undefined);
+  const updateAssetMutation = useUpdateAssetMutation();
+
+  // Initialize selected resource GUIDs when edit modal opens
+  useEffect(() => {
+    if (editAssetQuery.data?.responseData) {
+      const asset = editAssetQuery.data.responseData;
+      setSelectedCategoryGuid(asset.categoryGuid || "");
+      setSelectedDepartmentGuid(asset.departmentGuid || "");
+      setSelectedBranchGuid(asset.branchGuid || "");
+      setSelectedSupplierGuid(asset.supplierGuid || "");
+    }
+  }, [editAssetQuery.data]);
+
   const handleBack = () => {
     router.back();
   };
 
   const handleViewAsset = (asset: Asset) => {
-    toast.info("View Asset", {
-      description: `Viewing details for ${asset.assetName}`,
-    });
-    // Navigate to asset detail page
-    router.push(`/asset-details/${asset.id}`);
+    setViewAssetGuid(asset.id);
   };
 
   const handleEditAsset = (asset: Asset) => {
-    toast.info("Edit Asset", {
-      description: `Editing ${asset.assetName}`,
-    });
-    // Navigate to edit asset page
-    router.push(`/edit-asset/${asset.id}`);
+    setEditAssetGuid(asset.id);
   };
 
   const handleDisableAsset = (asset: Asset) => {
@@ -124,9 +388,16 @@ export default function AllAssetListPage() {
         { key: "tagNumber", header: "Tag Number" },
         { key: "assetName", header: "Asset Name" },
         { key: "serialNumber", header: "Serial Number" },
-        { key: "category", header: "Category" },
-        { key: "department", header: "Department" },
-        { key: "branch", header: "Branch" },
+        { key: "categoryName", header: "Category" },
+        { key: "categoryDescription", header: "Category Description" },
+        { key: "departmentName", header: "Department" },
+        { key: "departmentDescription", header: "Department Description" },
+        { key: "branchName", header: "Branch" },
+        { key: "branchAddress", header: "Branch Address" },
+        { key: "supplierName", header: "Supplier" },
+        { key: "supplierContactPerson", header: "Supplier Contact Person" },
+        { key: "supplierContactNumber", header: "Supplier Contact Number" },
+        { key: "supplierEmail", header: "Supplier Email" },
         {
           key: "acquisitionDate",
           header: "Acquisition Date",
@@ -142,11 +413,11 @@ export default function AllAssetListPage() {
           header: "Current Book Value",
           formatter: formatCurrencyForCSV,
         },
+        { key: "depreciationMethod", header: "Depreciation Method" },
         { key: "status", header: "Status" },
         { key: "condition", header: "Condition" },
         { key: "custodian", header: "Custodian" },
         { key: "location", header: "Location" },
-        { key: "supplier", header: "Supplier" },
         { key: "depreciationStatus", header: "Depreciation Status" },
       ];
 
@@ -233,56 +504,7 @@ export default function AllAssetListPage() {
       },
     },
     {
-      accessorKey: "category",
-      header: "Category",
-      cell: ({ row }) => {
-        const category = row.getValue("category") as string;
-        const getCategoryColor = (cat: string) => {
-          switch (cat) {
-            case "Computer Equipment":
-              return "bg-blue-100 text-blue-800 border-blue-200";
-            case "Office Furniture":
-              return "bg-green-100 text-green-800 border-green-200";
-            case "Vehicles":
-              return "bg-purple-100 text-purple-800 border-purple-200";
-            case "Office Equipment":
-              return "bg-yellow-100 text-yellow-800 border-yellow-200";
-            case "Building Equipment":
-              return "bg-gray-100 text-gray-800 border-gray-200";
-            case "Security Equipment":
-              return "bg-red-100 text-red-800 border-red-200";
-            case "Presentation Equipment":
-              return "bg-indigo-100 text-indigo-800 border-indigo-200";
-            default:
-              return "bg-slate-100 text-slate-800 border-slate-200";
-          }
-        };
-        return (
-          <Badge
-            variant="secondary"
-            className={`text-xs font-medium border ${getCategoryColor(
-              category
-            )} hover:shadow-sm transition-shadow duration-200`}
-          >
-            {category}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "department",
-      header: "Department",
-    },
-    {
-      accessorKey: "branch",
-      header: "Branch",
-      cell: ({ row }) => {
-        const branch = row.getValue("branch") as string;
-        return <div className="max-w-[150px] truncate">{branch}</div>;
-      },
-    },
-    {
-      accessorKey: "acquisitionDate",
+      accessorKey: "categoryName",
       header: ({ column }) => {
         return (
           <Button
@@ -290,7 +512,7 @@ export default function AllAssetListPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 p-0 hover:bg-transparent"
           >
-            Acquisition Date
+            Category
             {column.getIsSorted() === "asc" ? (
               <ArrowUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -302,7 +524,161 @@ export default function AllAssetListPage() {
         );
       },
       cell: ({ row }) => {
-        return formatDate(row.getValue("acquisitionDate"));
+        const categoryName = row.getValue("categoryName") as string;
+        const categoryDescription = row.original.categoryDescription;
+        const getCategoryColor = (cat: string) => {
+          const catLower = cat.toLowerCase();
+          if (catLower.includes("computer") || catLower.includes("equipment")) {
+            return "bg-blue-100 text-blue-800 border-blue-200";
+          } else if (catLower.includes("furniture")) {
+            return "bg-green-100 text-green-800 border-green-200";
+          } else if (catLower.includes("vehicle")) {
+            return "bg-purple-100 text-purple-800 border-purple-200";
+          } else if (catLower.includes("office")) {
+            return "bg-yellow-100 text-yellow-800 border-yellow-200";
+          } else if (catLower.includes("building")) {
+            return "bg-gray-100 text-gray-800 border-gray-200";
+          } else if (catLower.includes("security")) {
+            return "bg-red-100 text-red-800 border-red-200";
+          } else if (catLower.includes("presentation")) {
+            return "bg-indigo-100 text-indigo-800 border-indigo-200";
+          }
+          return "bg-slate-100 text-slate-800 border-slate-200";
+        };
+        return (
+          <div className="max-w-[200px]">
+            <Badge
+              variant="secondary"
+              className={`text-xs font-medium border ${getCategoryColor(
+                categoryName
+              )} hover:shadow-sm transition-shadow duration-200`}
+            >
+              {categoryName}
+            </Badge>
+            {categoryDescription && (
+              <div className="text-xs text-slate-500 mt-1 truncate">
+                {categoryDescription}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "departmentName",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Department
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const departmentName = row.getValue("departmentName") as string;
+        const departmentDescription = row.original.departmentDescription;
+        return (
+          <div className="max-w-[180px]">
+            <div className="font-medium text-slate-900">{departmentName}</div>
+            {departmentDescription && (
+              <div className="text-xs text-slate-500 truncate">
+                {departmentDescription}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "branchName",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Branch
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const branchName = row.getValue("branchName") as string;
+        const branchAddress = row.original.branchAddress;
+        return (
+          <div className="max-w-[180px]">
+            <div className="font-medium text-slate-900">{branchName}</div>
+            {branchAddress && (
+              <div className="text-xs text-slate-500 truncate">
+                {branchAddress}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "supplierName",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Supplier
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const supplierName = row.getValue("supplierName") as string;
+        const supplierContactPerson = row.original.supplierContactPerson;
+        const supplierContactNumber = row.original.supplierContactNumber;
+        const supplierEmail = row.original.supplierEmail;
+        return (
+          <div className="max-w-[220px]">
+            <div className="font-medium text-slate-900">{supplierName}</div>
+            {supplierContactPerson && (
+              <div className="text-xs text-slate-500 truncate">
+                {supplierContactPerson}
+              </div>
+            )}
+            {supplierContactNumber && (
+              <div className="text-xs text-slate-500 truncate">
+                {supplierContactNumber}
+              </div>
+            )}
+            {supplierEmail && (
+              <div className="text-xs text-slate-400 truncate">
+                {supplierEmail}
+              </div>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -314,7 +690,7 @@ export default function AllAssetListPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 p-0 hover:bg-transparent"
           >
-            Book Value
+            Current Book Value
             {column.getIsSorted() === "asc" ? (
               <ArrowUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -326,9 +702,48 @@ export default function AllAssetListPage() {
         );
       },
       cell: ({ row }) => {
-        const amount = row.getValue("currentBookValue") as number;
+        const value = row.getValue("currentBookValue") as number;
         return (
-          <div className="text-right font-medium">{formatCurrency(amount)}</div>
+          <div className="font-medium text-slate-900">
+            {new Intl.NumberFormat("en-NG", {
+              style: "currency",
+              currency: "NGN",
+            }).format(value)}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "depreciationMethod",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Depreciation Method
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const method = row.getValue("depreciationMethod") as string;
+        return (
+          <div className="max-w-[180px]">
+            <Badge
+              variant="secondary"
+              className="text-xs font-medium border bg-indigo-100 text-indigo-800 border-indigo-200 hover:shadow-sm transition-shadow duration-200"
+            >
+              {method || "N/A"}
+            </Badge>
+          </div>
         );
       },
     },
@@ -428,9 +843,9 @@ export default function AllAssetListPage() {
 
   // Filter data based on filters
   const filteredData = useMemo(() => {
-    return dummyAssets.filter((asset) => {
+    return assets.filter((asset: Asset) => {
       const matchesCategory =
-        categoryFilter === "All" || asset.category === categoryFilter;
+        categoryFilter === "All" || asset.categoryName === categoryFilter;
       const matchesStatus =
         statusFilter === "All" || asset.status === statusFilter;
       const matchesDepreciation =
@@ -439,7 +854,7 @@ export default function AllAssetListPage() {
 
       return matchesCategory && matchesStatus && matchesDepreciation;
     });
-  }, [categoryFilter, statusFilter, depreciationFilter]);
+  }, [assets, categoryFilter, statusFilter, depreciationFilter]);
 
   const table = useReactTable({
     data: filteredData,
@@ -459,14 +874,20 @@ export default function AllAssetListPage() {
         asset.assetName,
         asset.serialNumber,
         asset.tagNumber,
-        asset.department,
-        asset.branch,
-        asset.category,
+        asset.departmentName,
+        asset.branchName,
+        asset.categoryName,
+        asset.supplierName,
         asset.custodian,
       ];
 
+      const query = String(value ?? "").toLowerCase();
+      if (!query) return true;
+
       return searchableFields.some((field) =>
-        field.toLowerCase().includes(value.toLowerCase())
+        String(field ?? "")
+          .toLowerCase()
+          .includes(query)
       );
     },
     state: {
@@ -482,6 +903,27 @@ export default function AllAssetListPage() {
       },
     },
   });
+
+  // Error handling
+  if (assetsError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-100/50 flex items-center justify-center">
+        <Card className="p-8 text-center">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error Loading Assets</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Failed to load assets data. Please try refreshing the page.
+            </p>
+            <Button onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-100/50">
@@ -550,7 +992,7 @@ export default function AllAssetListPage() {
                 </div>
 
                 {/* Category Filter */}
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label>Category</Label>
                   <Select
                     value={categoryFilter}
@@ -561,14 +1003,20 @@ export default function AllAssetListPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="All">All Categories</SelectItem>
-                      {assetCategories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
+                      {categoriesLoading ? (
+                        <SelectItem value="loading" disabled>
+                          Loading categories...
                         </SelectItem>
-                      ))}
+                      ) : (
+                        assetCategories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
 
                 {/* Status Filter */}
                 <div className="space-y-2">
@@ -589,29 +1037,12 @@ export default function AllAssetListPage() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
-                {/* Depreciation Status Filter */}
-                <div className="space-y-2">
-                  <Label>Depreciation Status</Label>
-                  <Select
-                    value={depreciationFilter}
-                    onValueChange={setDepreciationFilter}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select depreciation status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {depreciationStatuses.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 {/* Results Info */}
                 <div className="flex items-end">
                   <div className="text-sm text-muted-foreground">
+                    {assetsFetching && (
+                      <span className="mr-2">Refreshing…</span>
+                    )}
                     Showing {table.getRowModel().rows.length} of{" "}
                     {filteredData.length} assets
                   </div>
@@ -649,7 +1080,15 @@ export default function AllAssetListPage() {
           {/* Assets Table */}
           <Card className="bg-white shadow-lg border-0 overflow-hidden">
             <CardContent className="p-0">
-              <div className="overflow-hidden">
+              {/* Scroll Guide */}
+              <div className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 border-b border-slate-200 py-3 px-6">
+                <div className="flex items-center justify-center text-sm text-slate-500 font-medium">
+                  <ChevronLeft className="h-4 w-4 mr-2 animate-pulse" />
+                  <span>Scroll to see all data</span>
+                  <ChevronRight className="h-4 w-4 ml-2 animate-pulse" />
+                </div>
+              </div>
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     {table.getHeaderGroups().map((headerGroup) => (
@@ -673,7 +1112,21 @@ export default function AllAssetListPage() {
                     ))}
                   </TableHeader>
                   <TableBody>
-                    {table.getRowModel().rows?.length ? (
+                    {assetsLoading ? (
+                      // Loading skeleton rows
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <TableRow key={index} className="border-0">
+                          {columns.map((_, colIndex) => (
+                            <TableCell
+                              key={colIndex}
+                              className="py-4 px-6 first:pl-8 last:pr-8 border-0"
+                            >
+                              <div className="h-4 bg-slate-200 rounded animate-pulse"></div>
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : table.getRowModel().rows?.length ? (
                       table.getRowModel().rows.map((row, index) => (
                         <TableRow
                           key={row.id}
@@ -733,9 +1186,12 @@ export default function AllAssetListPage() {
                       Rows per page
                     </p>
                     <Select
-                      value={`${table.getState().pagination.pageSize}`}
+                      value={String(pageSize)}
                       onValueChange={(value) => {
-                        table.setPageSize(Number(value));
+                        const next = parseInt(value, 10);
+                        setPageSize(next);
+                        setPageNumber(1);
+                        table.setPageSize(next);
                       }}
                     >
                       <SelectTrigger className="h-9 w-[75px] border-slate-200 shadow-sm">
@@ -752,16 +1208,16 @@ export default function AllAssetListPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex w-[100px] items-center justify-center text-sm font-semibold text-slate-700 bg-white rounded-lg px-3 py-1.5 border border-slate-200 shadow-sm">
-                    Page {table.getState().pagination.pageIndex + 1} of{" "}
-                    {table.getPageCount()}
+                  <div className="flex w-[140px] items-center justify-center text-sm font-semibold text-slate-700 bg-white rounded-lg px-3 py-1.5 border border-slate-200 shadow-sm">
+                    Page {pageNumber} of{" "}
+                    {assetsData?.responseData?.meta?.numberOfPages || 1}
                   </div>
                   <div className="flex items-center space-x-1">
                     <Button
                       variant="outline"
                       className="hidden h-9 w-9 p-0 lg:flex border-slate-200 hover:bg-slate-50 shadow-sm rounded-lg"
-                      onClick={() => table.setPageIndex(0)}
-                      disabled={!table.getCanPreviousPage()}
+                      onClick={() => setPageNumber(1)}
+                      disabled={pageNumber <= 1}
                     >
                       <span className="sr-only">Go to first page</span>
                       <ChevronLeft className="h-4 w-4" />
@@ -770,8 +1226,8 @@ export default function AllAssetListPage() {
                     <Button
                       variant="outline"
                       className="h-9 w-9 p-0 border-slate-200 hover:bg-slate-50 shadow-sm rounded-lg"
-                      onClick={() => table.previousPage()}
-                      disabled={!table.getCanPreviousPage()}
+                      onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+                      disabled={pageNumber <= 1}
                     >
                       <span className="sr-only">Go to previous page</span>
                       <ChevronLeft className="h-4 w-4" />
@@ -779,8 +1235,17 @@ export default function AllAssetListPage() {
                     <Button
                       variant="outline"
                       className="h-9 w-9 p-0 border-slate-200 hover:bg-slate-50 shadow-sm rounded-lg"
-                      onClick={() => table.nextPage()}
-                      disabled={!table.getCanNextPage()}
+                      onClick={() =>
+                        setPageNumber((p) => {
+                          const pages =
+                            assetsData?.responseData?.meta?.numberOfPages || 1;
+                          return Math.min(pages, p + 1);
+                        })
+                      }
+                      disabled={
+                        pageNumber >=
+                        (assetsData?.responseData?.meta?.numberOfPages || 1)
+                      }
                     >
                       <span className="sr-only">Go to next page</span>
                       <ChevronRight className="h-4 w-4" />
@@ -789,9 +1254,14 @@ export default function AllAssetListPage() {
                       variant="outline"
                       className="hidden h-9 w-9 p-0 lg:flex border-slate-200 hover:bg-slate-50 shadow-sm rounded-lg"
                       onClick={() =>
-                        table.setPageIndex(table.getPageCount() - 1)
+                        setPageNumber(
+                          assetsData?.responseData?.meta?.numberOfPages || 1
+                        )
                       }
-                      disabled={!table.getCanNextPage()}
+                      disabled={
+                        pageNumber >=
+                        (assetsData?.responseData?.meta?.numberOfPages || 1)
+                      }
                     >
                       <span className="sr-only">Go to last page</span>
                       <ChevronRight className="h-4 w-4" />
@@ -804,6 +1274,550 @@ export default function AllAssetListPage() {
           </Card>
         </div>
       </main>
+      {/* View Asset Modal */}
+      <Dialog
+        open={!!viewAssetGuid}
+        onOpenChange={(open) => !open && setViewAssetGuid(null)}
+      >
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-gray-800">
+              Asset Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewAssetQuery.isLoading ? (
+            <div className="py-12 text-center text-slate-500">
+              Loading asset…
+            </div>
+          ) : viewAssetQuery.data?.responseData ? (
+            (() => {
+              const asset = viewAssetQuery.data.responseData;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs text-slate-500">Tag Number</div>
+                    <div className="font-medium">{asset.tagNumber}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Asset Name</div>
+                    <div className="font-medium">{asset.assetName}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Serial Number</div>
+                    <div className="font-medium">{asset.serialNumber || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Brand Name</div>
+                    <div className="font-medium">{asset.brandName || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Model</div>
+                    <div className="font-medium">{asset.model || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">OS Version</div>
+                    <div className="font-medium">{asset.osVersion || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Status</div>
+                    <div className="font-medium">{asset.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Category</div>
+                    <div className="font-medium">
+                      {asset.category?.categoryName || "N/A"}
+                    </div>
+                    {asset.category?.description && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        {asset.category.description}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Department</div>
+                    <div className="font-medium">
+                      {asset.department?.departmentName || "N/A"}
+                    </div>
+                    {asset.department?.description && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        {asset.department.description}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Branch</div>
+                    <div className="font-medium">
+                      {asset.branch?.branchName || "N/A"}
+                    </div>
+                    {asset.branch?.address && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        {asset.branch.address}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Supplier</div>
+                    <div className="font-medium">
+                      {asset.supplier?.supplierName || "N/A"}
+                    </div>
+                    {asset.supplier?.contactPerson && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        Contact: {asset.supplier.contactPerson}
+                      </div>
+                    )}
+                    {asset.supplier?.contactNumber && (
+                      <div className="text-xs text-slate-400">
+                        {asset.supplier.contactNumber}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Condition</div>
+                    <div className="font-medium">{asset.condition}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Location</div>
+                    <div className="font-medium">{asset.locationDetail}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Acquisition Cost
+                    </div>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                      }).format(asset.acquisitionCost)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Current Book Value
+                    </div>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                      }).format(asset.currentBookValue)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Depreciation Method
+                    </div>
+                    <div className="font-medium">
+                      {asset.depreciationMethod || "N/A"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Useful Life (Years)
+                    </div>
+                    <div className="font-medium">{asset.usefulLifeYears}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Salvage Value</div>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                      }).format(asset.salvageValue)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="py-12 text-center text-slate-500">
+              No details available.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Asset Modal (skeleton form) */}
+      <Dialog
+        open={!!editAssetGuid}
+        onOpenChange={(open) => !open && setEditAssetGuid(null)}
+      >
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-gray-800">
+              Edit Asset
+            </DialogTitle>
+          </DialogHeader>
+          {editAssetQuery.isLoading ? (
+            <div className="py-12 text-center text-slate-500">Loading…</div>
+          ) : editAssetQuery.data?.responseData ? (
+            (() => {
+              const asset = editAssetQuery?.data?.responseData;
+              const nameRef = { current: null as HTMLInputElement | null };
+              const serialRef = { current: null as HTMLInputElement | null };
+              const tagRef = { current: null as HTMLInputElement | null };
+              const brandNameRef = { current: null as HTMLInputElement | null };
+              const modelRef = { current: null as HTMLInputElement | null };
+              const osVersionRef = { current: null as HTMLInputElement | null };
+              const conditionRef = { current: null as HTMLInputElement | null };
+              const statusRef = { current: null as HTMLInputElement | null };
+              const acquisitionDateRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const acquisitionCostRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const currentBookValueRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const locationDetailRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const depreciationMethodRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const usefulLifeYearsRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const salvageValueRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const handleSave = async () => {
+                try {
+                  await updateAssetMutation.mutateAsync({
+                    guid: asset.guid,
+                    assetName: nameRef.current?.value || asset.assetName,
+                    serialNumber:
+                      serialRef.current?.value || asset.serialNumber || "",
+                    tagNumber: tagRef.current?.value || asset.tagNumber,
+                    brandName: brandNameRef.current?.value || asset.brandName,
+                    model: modelRef.current?.value || asset.model,
+                    osVersion: osVersionRef.current?.value || asset.osVersion || undefined,
+                    categoryGuid: selectedCategoryGuid || asset.categoryGuid,
+                    departmentGuid:
+                      selectedDepartmentGuid || asset.departmentGuid,
+                    branchGuid: selectedBranchGuid || asset.branchGuid,
+                    supplierGuid: selectedSupplierGuid || asset.supplierGuid,
+                    acquisitionDate:
+                      acquisitionDateRef.current?.value ||
+                      asset.acquisitionDate,
+                    acquisitionCost: Number(
+                      acquisitionCostRef.current?.value ?? asset.acquisitionCost
+                    ),
+                    locationDetail:
+                      locationDetailRef.current?.value || asset.locationDetail,
+                    condition: conditionRef.current?.value || asset.condition,
+                    status: statusRef.current?.value || asset.status,
+                    depreciationMethod:
+                      depreciationMethodRef.current?.value ||
+                      asset.depreciationMethod,
+                    usefulLifeYears: Number(
+                      usefulLifeYearsRef.current?.value ?? asset.usefulLifeYears
+                    ),
+                    salvageValue: Number(
+                      salvageValueRef.current?.value ?? asset.salvageValue
+                    ),
+                    t24AssetReference: asset.t24AssetReference || "",
+                    lastT24ValuationDate: asset.lastT24ValuationDate || "",
+                    custodian: selectedContact?.name || "",
+                  });
+                  if (updateAssetMutation.isSuccess) {
+                    toast.success("Asset updated successfully");
+                  } else {
+                    toast.error("Failed to update asset");
+                  }
+                  setEditAssetGuid(null);
+                } catch {
+                  toast.error("Failed to update asset");
+                }
+              };
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Asset Name
+                      </div>
+                      <input
+                        defaultValue={asset.assetName}
+                        ref={nameRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Tag Number
+                      </div>
+                      <input
+                        defaultValue={asset.tagNumber}
+                        ref={tagRef}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Brand Name
+                      </div>
+                      <input
+                        defaultValue={asset.brandName || ""}
+                        ref={brandNameRef}
+                        placeholder="Enter brand name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Model
+                      </div>
+                      <input
+                        defaultValue={asset.model || ""}
+                        ref={modelRef}
+                        placeholder="Enter model"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Serial Number (Optional)
+                      </div>
+                      <input
+                        defaultValue={asset.serialNumber || ""}
+                        ref={serialRef}
+                        placeholder="Enter serial number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        OS Version (Optional)
+                      </div>
+                      <input
+                        defaultValue={asset.osVersion || ""}
+                        ref={osVersionRef}
+                        placeholder="Enter OS version"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Condition
+                      </div>
+                      <input
+                        defaultValue={asset.condition}
+                        ref={conditionRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">Status</div>
+                      <input
+                        defaultValue={asset.status}
+                        ref={statusRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Category Name
+                      </div>
+                      {asset.category?.categoryName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.category.categoryName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={categoryOptions}
+                        value={selectedCategoryGuid}
+                        onValueChange={(value) =>
+                          setSelectedCategoryGuid(value)
+                        }
+                        onSearchChange={setCategorySearchTerm}
+                        placeholder="Search and select a category..."
+                        emptyMessage="No categories found. Try adjusting your search."
+                        loading={categoriesLoading}
+                        clearable={false}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Department Name
+                      </div>
+                      {asset.department?.departmentName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.department.departmentName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={departmentOptions}
+                        value={selectedDepartmentGuid}
+                        onValueChange={(value) =>
+                          setSelectedDepartmentGuid(value)
+                        }
+                        onSearchChange={setDepartmentSearchTerm}
+                        placeholder="Search and select a department..."
+                        emptyMessage="No departments found. Try adjusting your search."
+                        loading={departmentsLoading}
+                        clearable={false}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Branch Name
+                      </div>
+                      {asset.branch?.branchName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.branch.branchName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={branchOptions}
+                        value={selectedBranchGuid}
+                        onValueChange={(value) => setSelectedBranchGuid(value)}
+                        onSearchChange={setBranchSearchTerm}
+                        placeholder="Search and select a branch..."
+                        emptyMessage="No branches found. Try adjusting your search."
+                        loading={branchesLoading}
+                        clearable={false}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Supplier Name
+                      </div>
+                      {asset.supplier?.supplierName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.supplier.supplierName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={supplierOptions}
+                        value={selectedSupplierGuid}
+                        onValueChange={(value) =>
+                          setSelectedSupplierGuid(value)
+                        }
+                        onSearchChange={setSupplierSearchTerm}
+                        placeholder="Search and select a supplier..."
+                        emptyMessage="No suppliers found. Try adjusting your search."
+                        loading={suppliersLoading}
+                        clearable={false}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Acquisition Date
+                      </div>
+                      <input
+                        type="date"
+                        defaultValue={asset.acquisitionDate?.slice(0, 10)}
+                        ref={acquisitionDateRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Acquisition Cost
+                      </div>
+                      <input
+                        type="number"
+                        defaultValue={String(asset.acquisitionCost)}
+                        ref={acquisitionCostRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Current Book Value
+                      </div>
+                      <input
+                        type="number"
+                        defaultValue={String(asset.currentBookValue)}
+                        ref={currentBookValueRef}
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed text-gray-600"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Location Detail
+                      </div>
+                      <input
+                        defaultValue={asset.locationDetail}
+                        ref={locationDetailRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Depreciation Method
+                      </div>
+                      <input
+                        defaultValue={asset.depreciationMethod}
+                        ref={depreciationMethodRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Useful Life (years)
+                      </div>
+                      <input
+                        type="number"
+                        defaultValue={String(asset.usefulLifeYears)}
+                        ref={usefulLifeYearsRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Salvage Value
+                      </div>
+                      <input
+                        type="number"
+                        defaultValue={String(asset.salvageValue)}
+                        ref={salvageValueRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Custodian
+                      </div>
+
+                      <SearchableSelect
+                        options={contactOptions}
+                        value={selectedContact?.email || ""}
+                        onValueChange={(value) => {
+                          const contact = contacts.find(
+                            (c: Contact) => c.email === value
+                          );
+                          setSelectedContact(contact || null);
+                        }}
+                        onSearchChange={handleContactSearch}
+                        placeholder="Search and select a contact..."
+                        emptyMessage="No contacts found. Try adjusting your search."
+                        loading={contactsLoading}
+                        clearable={true}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSave}
+                      disabled={updateAssetMutation.isPending}
+                      className="bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      {updateAssetMutation.isPending
+                        ? "Saving…"
+                        : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="py-12 text-center text-slate-500">No data</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

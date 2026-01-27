@@ -52,13 +52,41 @@ export const assetSchema = z
 
     serialNumber: z
       .string()
-      .min(1, "Serial number is required")
-      .min(3, "Serial number must be at least 3 characters")
       .max(50, "Serial number must not exceed 50 characters")
       .regex(
-        /^[A-Z0-9-_]+$/i,
+        /^[A-Z0-9-_]*$/i,
         "Serial number can only contain letters, numbers, hyphens, and underscores"
+      )
+      .optional()
+      .or(z.literal("")),
+
+    tagNumber: z
+      .string()
+      .min(1, "Tag number is required")
+      .min(3, "Tag number must be at least 3 characters")
+      .max(50, "Tag number must not exceed 50 characters")
+      .regex(
+        /^[A-Z0-9-_]+$/i,
+        "Tag number can only contain letters, numbers, hyphens, and underscores"
       ),
+
+    brandName: z
+      .string()
+      .min(1, "Brand name is required")
+      .min(2, "Brand name must be at least 2 characters")
+      .max(100, "Brand name must not exceed 100 characters"),
+
+    model: z
+      .string()
+      .min(1, "Model is required")
+      .min(2, "Model must be at least 2 characters")
+      .max(100, "Model must not exceed 100 characters"),
+
+    osVersion: z
+      .string()
+      .max(50, "OS version must not exceed 50 characters")
+      .optional()
+      .or(z.literal("")),
 
     assetCategory: z.string().min(1, "Asset category is required"),
 
@@ -74,7 +102,12 @@ export const assetSchema = z
     acquisitionCost: z
       .number()
       .min(0, "Acquisition cost must be a positive number")
-      .max(10000000, "Acquisition cost seems unreasonably high"),
+      .max(10000000, "Acquisition cost seems unreasonably high")
+      .refine((val) => {
+        // Check if the number has at most 2 decimal places
+        const decimalPart = val.toString().split(".")[1];
+        return !decimalPart || decimalPart.length <= 2;
+      }, "Acquisition cost can only have up to 2 decimal places"),
 
     department: z.string().min(1, "Department/Unit is required"),
 
@@ -112,16 +145,14 @@ export const assetSchema = z
       .min(1, "Useful life must be at least 1 year")
       .max(100, "Useful life cannot exceed 100 years"),
 
-    salvageValue: z.number().min(0, "Salvage value must be a positive number"),
-
-    t24AssetId: z
-      .string()
-      .min(1, "T24 Asset ID is required")
-      .max(50, "T24 Asset ID must not exceed 50 characters")
-      .regex(
-        /^[A-Z0-9-_]+$/i,
-        "T24 Asset ID can only contain letters, numbers, hyphens, and underscores"
-      ),
+    salvageValue: z
+      .number()
+      .min(0, "Salvage value must be a positive number")
+      .refine((val) => {
+        // Check if the number has at most 2 decimal places
+        const decimalPart = val.toString().split(".")[1];
+        return !decimalPart || decimalPart.length <= 2;
+      }, "Salvage value can only have up to 2 decimal places"),
 
     custodian: z
       .string()

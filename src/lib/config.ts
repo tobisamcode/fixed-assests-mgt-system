@@ -1,19 +1,16 @@
-// Environment configuration with type safety
 export const config = {
-  // API Configuration
   api: {
-    baseURL:
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001/api/v1",
+    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "10000"),
   },
 
-  // Authentication
   auth: {
     enabled: process.env.NEXT_PUBLIC_AUTH_ENABLED === "true",
     secret: process.env.AUTH_SECRET || "fallback-secret-key",
+    channelId: process.env.NEXT_PUBLIC_CHANNEL_ID,
+    channelSecret: process.env.NEXT_PUBLIC_CHANNEL_SECRET,
   },
 
-  // External Services
   services: {
     stripe: {
       publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
@@ -24,12 +21,10 @@ export const config = {
     },
   },
 
-  // Database (if needed)
   database: {
     url: process.env.DATABASE_URL,
   },
 
-  // Email Service (if needed)
   email: {
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : undefined,
@@ -37,7 +32,6 @@ export const config = {
     pass: process.env.SMTP_PASS,
   },
 
-  // File Storage (if needed)
   storage: {
     aws: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -47,7 +41,6 @@ export const config = {
     },
   },
 
-  // Environment
   env: {
     isDevelopment: process.env.NODE_ENV === "development",
     isProduction: process.env.NODE_ENV === "production",
@@ -55,13 +48,10 @@ export const config = {
   },
 } as const;
 
-// Type-safe environment variable access
 export type Config = typeof config;
 
-// Helper function to validate required environment variables
 export function validateEnv(): void {
   const requiredVars: string[] = [
-    // Add any required environment variables here
     // 'NEXT_PUBLIC_API_BASE_URL',
   ];
 
@@ -74,7 +64,6 @@ export function validateEnv(): void {
   }
 }
 
-// Validate environment variables in development
 if (config.env.isDevelopment) {
   validateEnv();
 }
