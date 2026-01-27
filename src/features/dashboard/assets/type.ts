@@ -33,6 +33,9 @@ export interface Asset {
   assetName: string;
   serialNumber: string;
   tagNumber: string;
+  brandName: string;
+  model: string;
+  osVersion?: string;
   categoryGuid: string;
   departmentGuid: string;
   branchGuid: string;
@@ -70,13 +73,16 @@ export interface UpdateAssetRequest {
   assetName: string;
   serialNumber: string;
   tagNumber: string;
+  brandName: string;
+  model: string;
+  osVersion?: string;
   categoryGuid: string;
   departmentGuid: string;
   branchGuid: string;
   supplierGuid: string;
   acquisitionDate: string;
   acquisitionCost: number;
-  currentBookValue: number;
+  currentBookValue?: number; // Optional - should not be sent in update requests
   locationDetail: string;
   condition: string;
   status: string;
@@ -94,6 +100,9 @@ export interface CreateAssetRequest {
   assetName: string;
   serialNumber: string;
   tagNumber: string;
+  brandName: string;
+  model: string;
+  osVersion?: string;
   categoryGuid: string;
   departmentGuid: string;
   branchGuid: string;
