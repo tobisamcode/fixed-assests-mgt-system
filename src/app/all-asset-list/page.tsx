@@ -80,6 +80,14 @@ import {
   Contact,
   useContactsQuery,
 } from "@/features/dashboard/admin-management";
+import { useCategoriesQuery } from "@/features/dashboard/category/services/queries";
+import { Category } from "@/features/dashboard/category/type";
+import { useDepartmentsQuery } from "@/features/dashboard/departments/services/queries";
+import { Department } from "@/features/dashboard/departments/type";
+import { useBranches } from "@/features/dashboard/branches/services/queries";
+import { Branch } from "@/features/dashboard/branches/type";
+import { useSuppliersQuery } from "@/features/dashboard/supplier/services/queries";
+import { Supplier } from "@/features/dashboard/supplier/type";
 
 // Asset interface for the component (compatible with existing table structure)
 interface Asset {
@@ -87,6 +95,9 @@ interface Asset {
   tagNumber: string;
   assetName: string;
   serialNumber: string;
+  brandName: string;
+  model: string;
+  osVersion?: string;
   categoryName: string;
   categoryDescription: string;
   departmentName: string;
@@ -102,6 +113,7 @@ interface Asset {
   acquisitionDate: string;
   acquisitionCost: number;
   currentBookValue: number;
+  depreciationMethod: string;
   status: "Active" | "Disabled" | "Disposed";
   condition: string;
   custodian: string;
@@ -115,6 +127,19 @@ export default function AllAssetListPage() {
   const [contactSearchTerm, setContactSearchTerm] = useState("");
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
+  // Search terms for resources
+  const [categorySearchTerm, setCategorySearchTerm] = useState("");
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [branchSearchTerm, setBranchSearchTerm] = useState("");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+
+  // Selected resource GUIDs for editing
+  const [selectedCategoryGuid, setSelectedCategoryGuid] = useState<string>("");
+  const [selectedDepartmentGuid, setSelectedDepartmentGuid] =
+    useState<string>("");
+  const [selectedBranchGuid, setSelectedBranchGuid] = useState<string>("");
+  const [selectedSupplierGuid, setSelectedSupplierGuid] = useState<string>("");
+
   const handleContactSearch = (search: string) => {
     setContactSearchTerm(search);
   };
@@ -123,11 +148,82 @@ export default function AllAssetListPage() {
   );
   const contacts = contactsData?.responseData?.records || [];
 
+  // Queries for resources
+  const { data: categoriesData, isLoading: categoriesLoading } =
+    useCategoriesQuery({
+      pageNumber: 1,
+      pageSize: 100,
+      ...(categorySearchTerm.trim() && {
+        searchKey: categorySearchTerm.trim(),
+      }),
+    });
+  const categories = categoriesData?.responseData?.records || [];
+
+  const { data: departmentsData, isLoading: departmentsLoading } =
+    useDepartmentsQuery({
+      pageNumber: 1,
+      pageSize: 100,
+      ...(departmentSearchTerm.trim() && {
+        searchKey: departmentSearchTerm.trim(),
+      }),
+    });
+  const departments = departmentsData?.responseData?.records || [];
+
+  const { data: branchesData, isLoading: branchesLoading } = useBranches({
+    pageNumber: 1,
+    pageSize: 100,
+    ...(branchSearchTerm.trim() && { searchKey: branchSearchTerm.trim() }),
+  });
+  const branches = branchesData?.responseData?.records || [];
+
+  const { data: suppliersData, isLoading: suppliersLoading } =
+    useSuppliersQuery({
+      pageNumber: 1,
+      pageSize: 100,
+      ...(supplierSearchTerm.trim() && {
+        searchKey: supplierSearchTerm.trim(),
+      }),
+    });
+  const suppliers = suppliersData?.responseData?.records || [];
+
   const contactOptions: SearchableSelectOption[] = contacts.map(
     (contact: Contact) => ({
       value: contact.email,
       label: contact.name,
       description: `${contact.email} • ${contact.username}`,
+    })
+  );
+
+  // Resource options for searchable selects
+  const categoryOptions: SearchableSelectOption[] = categories.map(
+    (category: Category) => ({
+      value: category.guid,
+      label: category.categoryName,
+      description: category.description || "",
+    })
+  );
+
+  const departmentOptions: SearchableSelectOption[] = departments.map(
+    (department: Department) => ({
+      value: department.guid,
+      label: department.departmentName,
+      description: department.description || "",
+    })
+  );
+
+  const branchOptions: SearchableSelectOption[] = branches.map(
+    (branch: Branch) => ({
+      value: branch.guid,
+      label: branch.branchName,
+      description: branch.address || "",
+    })
+  );
+
+  const supplierOptions: SearchableSelectOption[] = suppliers.map(
+    (supplier: Supplier) => ({
+      value: supplier.guid,
+      label: supplier.supplierName,
+      description: `${supplier.contactPerson || ""} • ${supplier.email || ""}`,
     })
   );
 
@@ -208,6 +304,9 @@ export default function AllAssetListPage() {
         tagNumber: apiAsset.tagNumber,
         assetName: apiAsset.assetName,
         serialNumber: apiAsset.serialNumber,
+        brandName: apiAsset.brandName || "",
+        model: apiAsset.model || "",
+        osVersion: apiAsset.osVersion || "",
         categoryName: apiAsset.category?.categoryName || "",
         categoryDescription: apiAsset.category?.description || "",
         departmentName: apiAsset.department?.departmentName || "",
@@ -223,6 +322,7 @@ export default function AllAssetListPage() {
         acquisitionDate: apiAsset.acquisitionDate,
         acquisitionCost: apiAsset.acquisitionCost,
         currentBookValue: apiAsset.currentBookValue,
+        depreciationMethod: apiAsset.depreciationMethod || "",
         status: mapStatus(apiAsset.status as unknown as string),
         condition: apiAsset.condition,
         custodian: custodianName || "",
@@ -243,6 +343,17 @@ export default function AllAssetListPage() {
   const viewAssetQuery = useAssetByGuidQuery(viewAssetGuid || undefined);
   const editAssetQuery = useAssetByGuidQuery(editAssetGuid || undefined);
   const updateAssetMutation = useUpdateAssetMutation();
+
+  // Initialize selected resource GUIDs when edit modal opens
+  useEffect(() => {
+    if (editAssetQuery.data?.responseData) {
+      const asset = editAssetQuery.data.responseData;
+      setSelectedCategoryGuid(asset.categoryGuid || "");
+      setSelectedDepartmentGuid(asset.departmentGuid || "");
+      setSelectedBranchGuid(asset.branchGuid || "");
+      setSelectedSupplierGuid(asset.supplierGuid || "");
+    }
+  }, [editAssetQuery.data]);
 
   const handleBack = () => {
     router.back();
@@ -302,6 +413,7 @@ export default function AllAssetListPage() {
           header: "Current Book Value",
           formatter: formatCurrencyForCSV,
         },
+        { key: "depreciationMethod", header: "Depreciation Method" },
         { key: "status", header: "Status" },
         { key: "condition", header: "Condition" },
         { key: "custodian", header: "Custodian" },
@@ -569,7 +681,72 @@ export default function AllAssetListPage() {
         );
       },
     },
-
+    {
+      accessorKey: "currentBookValue",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Current Book Value
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const value = row.getValue("currentBookValue") as number;
+        return (
+          <div className="font-medium text-slate-900">
+            {new Intl.NumberFormat("en-NG", {
+              style: "currency",
+              currency: "NGN",
+            }).format(value)}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "depreciationMethod",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Depreciation Method
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const method = row.getValue("depreciationMethod") as string;
+        return (
+          <div className="max-w-[180px]">
+            <Badge
+              variant="secondary"
+              className="text-xs font-medium border bg-indigo-100 text-indigo-800 border-indigo-200 hover:shadow-sm transition-shadow duration-200"
+            >
+              {method || "N/A"}
+            </Badge>
+          </div>
+        );
+      },
+    },
     {
       accessorKey: "status",
       header: "Status",
@@ -903,7 +1080,15 @@ export default function AllAssetListPage() {
           {/* Assets Table */}
           <Card className="bg-white shadow-lg border-0 overflow-hidden">
             <CardContent className="p-0">
-              <div className="overflow-hidden">
+              {/* Scroll Guide */}
+              <div className="bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 border-b border-slate-200 py-3 px-6">
+                <div className="flex items-center justify-center text-sm text-slate-500 font-medium">
+                  <ChevronLeft className="h-4 w-4 mr-2 animate-pulse" />
+                  <span>Scroll to see all data</span>
+                  <ChevronRight className="h-4 w-4 ml-2 animate-pulse" />
+                </div>
+              </div>
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     {table.getHeaderGroups().map((headerGroup) => (
@@ -1119,7 +1304,19 @@ export default function AllAssetListPage() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Serial Number</div>
-                    <div className="font-medium">{asset.serialNumber}</div>
+                    <div className="font-medium">{asset.serialNumber || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Brand Name</div>
+                    <div className="font-medium">{asset.brandName || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Model</div>
+                    <div className="font-medium">{asset.model || "N/A"}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">OS Version</div>
+                    <div className="font-medium">{asset.osVersion || "N/A"}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Status</div>
@@ -1182,6 +1379,51 @@ export default function AllAssetListPage() {
                     <div className="text-xs text-slate-500">Location</div>
                     <div className="font-medium">{asset.locationDetail}</div>
                   </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Acquisition Cost
+                    </div>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                      }).format(asset.acquisitionCost)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Current Book Value
+                    </div>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                      }).format(asset.currentBookValue)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Depreciation Method
+                    </div>
+                    <div className="font-medium">
+                      {asset.depreciationMethod || "N/A"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Useful Life (Years)
+                    </div>
+                    <div className="font-medium">{asset.usefulLifeYears}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">Salvage Value</div>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat("en-NG", {
+                        style: "currency",
+                        currency: "NGN",
+                      }).format(asset.salvageValue)}
+                    </div>
+                  </div>
                 </div>
               );
             })()
@@ -1212,20 +1454,11 @@ export default function AllAssetListPage() {
               const nameRef = { current: null as HTMLInputElement | null };
               const serialRef = { current: null as HTMLInputElement | null };
               const tagRef = { current: null as HTMLInputElement | null };
+              const brandNameRef = { current: null as HTMLInputElement | null };
+              const modelRef = { current: null as HTMLInputElement | null };
+              const osVersionRef = { current: null as HTMLInputElement | null };
               const conditionRef = { current: null as HTMLInputElement | null };
               const statusRef = { current: null as HTMLInputElement | null };
-              const categoryGuidRef = {
-                current: null as HTMLInputElement | null,
-              };
-              const departmentGuidRef = {
-                current: null as HTMLInputElement | null,
-              };
-              const branchGuidRef = {
-                current: null as HTMLInputElement | null,
-              };
-              const supplierGuidRef = {
-                current: null as HTMLInputElement | null,
-              };
               const acquisitionDateRef = {
                 current: null as HTMLInputElement | null,
               };
@@ -1247,37 +1480,27 @@ export default function AllAssetListPage() {
               const salvageValueRef = {
                 current: null as HTMLInputElement | null,
               };
-              const t24AssetReferenceRef = {
-                current: null as HTMLInputElement | null,
-              };
-              const lastT24ValuationDateRef = {
-                current: null as HTMLInputElement | null,
-              };
               const handleSave = async () => {
                 try {
                   await updateAssetMutation.mutateAsync({
                     guid: asset.guid,
                     assetName: nameRef.current?.value || asset.assetName,
                     serialNumber:
-                      serialRef.current?.value || asset.serialNumber,
+                      serialRef.current?.value || asset.serialNumber || "",
                     tagNumber: tagRef.current?.value || asset.tagNumber,
-                    categoryGuid:
-                      categoryGuidRef.current?.value || asset.categoryGuid,
+                    brandName: brandNameRef.current?.value || asset.brandName,
+                    model: modelRef.current?.value || asset.model,
+                    osVersion: osVersionRef.current?.value || asset.osVersion || undefined,
+                    categoryGuid: selectedCategoryGuid || asset.categoryGuid,
                     departmentGuid:
-                      departmentGuidRef.current?.value || asset.departmentGuid,
-                    branchGuid:
-                      branchGuidRef.current?.value || asset.branchGuid,
-                    supplierGuid:
-                      supplierGuidRef.current?.value || asset.supplierGuid,
+                      selectedDepartmentGuid || asset.departmentGuid,
+                    branchGuid: selectedBranchGuid || asset.branchGuid,
+                    supplierGuid: selectedSupplierGuid || asset.supplierGuid,
                     acquisitionDate:
                       acquisitionDateRef.current?.value ||
                       asset.acquisitionDate,
                     acquisitionCost: Number(
                       acquisitionCostRef.current?.value ?? asset.acquisitionCost
-                    ),
-                    currentBookValue: Number(
-                      currentBookValueRef.current?.value ??
-                        asset.currentBookValue
                     ),
                     locationDetail:
                       locationDetailRef.current?.value || asset.locationDetail,
@@ -1292,12 +1515,8 @@ export default function AllAssetListPage() {
                     salvageValue: Number(
                       salvageValueRef.current?.value ?? asset.salvageValue
                     ),
-                    t24AssetReference:
-                      t24AssetReferenceRef.current?.value ||
-                      asset.t24AssetReference,
-                    lastT24ValuationDate:
-                      lastT24ValuationDateRef.current?.value ||
-                      asset.lastT24ValuationDate,
+                    t24AssetReference: asset.t24AssetReference || "",
+                    lastT24ValuationDate: asset.lastT24ValuationDate || "",
                     custodian: selectedContact?.name || "",
                   });
                   if (updateAssetMutation.isSuccess) {
@@ -1325,21 +1544,56 @@ export default function AllAssetListPage() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Serial Number
-                      </div>
-                      <input
-                        defaultValue={asset.serialNumber}
-                        ref={serialRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 mb-1">
                         Tag Number
                       </div>
                       <input
                         defaultValue={asset.tagNumber}
                         ref={tagRef}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Brand Name
+                      </div>
+                      <input
+                        defaultValue={asset.brandName || ""}
+                        ref={brandNameRef}
+                        placeholder="Enter brand name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Model
+                      </div>
+                      <input
+                        defaultValue={asset.model || ""}
+                        ref={modelRef}
+                        placeholder="Enter model"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Serial Number (Optional)
+                      </div>
+                      <input
+                        defaultValue={asset.serialNumber || ""}
+                        ref={serialRef}
+                        placeholder="Enter serial number"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        OS Version (Optional)
+                      </div>
+                      <input
+                        defaultValue={asset.osVersion || ""}
+                        ref={osVersionRef}
+                        placeholder="Enter OS version"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       />
                     </div>
@@ -1363,42 +1617,88 @@ export default function AllAssetListPage() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Category GUID
+                        Category Name
                       </div>
-                      <input
-                        defaultValue={asset.categoryGuid}
-                        ref={categoryGuidRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      {asset.category?.categoryName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.category.categoryName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={categoryOptions}
+                        value={selectedCategoryGuid}
+                        onValueChange={(value) =>
+                          setSelectedCategoryGuid(value)
+                        }
+                        onSearchChange={setCategorySearchTerm}
+                        placeholder="Search and select a category..."
+                        emptyMessage="No categories found. Try adjusting your search."
+                        loading={categoriesLoading}
+                        clearable={false}
                       />
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Department GUID
+                        Department Name
                       </div>
-                      <input
-                        defaultValue={asset.departmentGuid}
-                        ref={departmentGuidRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      {asset.department?.departmentName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.department.departmentName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={departmentOptions}
+                        value={selectedDepartmentGuid}
+                        onValueChange={(value) =>
+                          setSelectedDepartmentGuid(value)
+                        }
+                        onSearchChange={setDepartmentSearchTerm}
+                        placeholder="Search and select a department..."
+                        emptyMessage="No departments found. Try adjusting your search."
+                        loading={departmentsLoading}
+                        clearable={false}
                       />
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Branch GUID
+                        Branch Name
                       </div>
-                      <input
-                        defaultValue={asset.branchGuid}
-                        ref={branchGuidRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      {asset.branch?.branchName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.branch.branchName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={branchOptions}
+                        value={selectedBranchGuid}
+                        onValueChange={(value) => setSelectedBranchGuid(value)}
+                        onSearchChange={setBranchSearchTerm}
+                        placeholder="Search and select a branch..."
+                        emptyMessage="No branches found. Try adjusting your search."
+                        loading={branchesLoading}
+                        clearable={false}
                       />
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Supplier GUID
+                        Supplier Name
                       </div>
-                      <input
-                        defaultValue={asset.supplierGuid}
-                        ref={supplierGuidRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      {asset.supplier?.supplierName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.supplier.supplierName}
+                        </div>
+                      )}
+                      <SearchableSelect
+                        options={supplierOptions}
+                        value={selectedSupplierGuid}
+                        onValueChange={(value) =>
+                          setSelectedSupplierGuid(value)
+                        }
+                        onSearchChange={setSupplierSearchTerm}
+                        placeholder="Search and select a supplier..."
+                        emptyMessage="No suppliers found. Try adjusting your search."
+                        loading={suppliersLoading}
+                        clearable={false}
                       />
                     </div>
                     <div>
@@ -1431,7 +1731,8 @@ export default function AllAssetListPage() {
                         type="number"
                         defaultValue={String(asset.currentBookValue)}
                         ref={currentBookValueRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed text-gray-600"
                       />
                     </div>
                     <div>
@@ -1473,27 +1774,6 @@ export default function AllAssetListPage() {
                         type="number"
                         defaultValue={String(asset.salvageValue)}
                         ref={salvageValueRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 mb-1">
-                        T24 Asset Reference
-                      </div>
-                      <input
-                        defaultValue={asset.t24AssetReference}
-                        ref={t24AssetReferenceRef}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 mb-1">
-                        Last T24 Valuation Date
-                      </div>
-                      <input
-                        type="datetime-local"
-                        defaultValue={asset.lastT24ValuationDate?.slice(0, 16)}
-                        ref={lastT24ValuationDateRef}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       />
                     </div>
