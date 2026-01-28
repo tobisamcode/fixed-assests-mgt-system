@@ -18,3 +18,12 @@ export const useAssetByGuidQuery = (guid?: string) => {
     staleTime: 5 * 60 * 1000,
   });
 };
+
+export const useCustodianHistoryQuery = (guid?: string) => {
+  return useQuery({
+    queryKey: ["custodian-history", guid],
+    queryFn: () => assetApi.getCustodianHistory(guid as string),
+    enabled: Boolean(guid),
+    staleTime: 2 * 60 * 1000,
+  });
+};
