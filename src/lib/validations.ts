@@ -70,21 +70,43 @@ export const assetSchema = z
         "Tag number can only contain letters, numbers, hyphens, and underscores"
       ),
 
-    brandName: z
+    brand: z
       .string()
-      .min(1, "Brand name is required")
-      .min(2, "Brand name must be at least 2 characters")
-      .max(100, "Brand name must not exceed 100 characters"),
+      .max(100, "Brand must not exceed 100 characters")
+      .optional()
+      .or(z.literal("")),
 
     model: z
       .string()
-      .min(1, "Model is required")
-      .min(2, "Model must be at least 2 characters")
-      .max(100, "Model must not exceed 100 characters"),
+      .max(100, "Model must not exceed 100 characters")
+      .optional()
+      .or(z.literal("")),
 
-    osVersion: z
+    oem: z
+      .string()
+      .max(100, "OEM must not exceed 100 characters")
+      .optional()
+      .or(z.literal("")),
+
+    operatingSystemVersion: z
       .string()
       .max(50, "OS version must not exceed 50 characters")
+      .optional()
+      .or(z.literal("")),
+
+    releaseVersion: z
+      .string()
+      .max(50, "Release version must not exceed 50 characters")
+      .optional()
+      .or(z.literal("")),
+
+    eolEoslDate: z
+      .string()
+      .optional()
+      .or(z.literal("")),
+
+    locationStatus: z
+      .string()
       .optional()
       .or(z.literal("")),
 
