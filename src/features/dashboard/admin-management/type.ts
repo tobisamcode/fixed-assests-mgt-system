@@ -57,6 +57,7 @@ export interface UserResponse extends BaseResponse {
 // Contact structure from /admin-mgt/contacts
 export interface Contact {
   id: number;
+  guid: string;
   name: string;
   email: string;
   username: string;
