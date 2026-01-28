@@ -15,6 +15,7 @@ export const useCreateUserMutation = () => {
     mutationFn: (payload: CreateUserPayload) => adminApi.createUser(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["platformRoles"] });
     },
   });
 };
@@ -54,6 +55,7 @@ export const useUpdatePlatformUserMutation = () => {
       adminApi.updatePlatformUser(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["platformRoles"] });
     },
   });
 };
@@ -66,6 +68,7 @@ export const useDeactivatePlatformUserMutation = () => {
       adminApi.deactivatePlatformUser(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["platformRoles"] });
     },
   });
 };
