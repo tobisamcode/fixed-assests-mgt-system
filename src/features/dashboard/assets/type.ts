@@ -33,9 +33,6 @@ export interface Asset {
   assetName: string;
   serialNumber: string;
   tagNumber: string;
-  brandName: string;
-  model: string;
-  osVersion?: string;
   categoryGuid: string;
   departmentGuid: string;
   branchGuid: string;
@@ -55,7 +52,16 @@ export interface Asset {
   salvageValue: number;
   t24AssetReference: string;
   lastT24ValuationDate: string;
-  custodian: string;
+  custodianGuid: string;
+  oem?: string;
+  model?: string;
+  brand?: string;
+  operatingSystemVersion?: string;
+  releaseVersion?: string;
+  eolEoslDate?: string;
+  locationStatus?: string;
+  returnDate?: string;
+  collectionDate?: string;
 }
 
 export type AssetApiResponse = PaginatedApiResponse<Asset>;
@@ -73,16 +79,13 @@ export interface UpdateAssetRequest {
   assetName: string;
   serialNumber: string;
   tagNumber: string;
-  brandName: string;
-  model: string;
-  osVersion?: string;
   categoryGuid: string;
   departmentGuid: string;
   branchGuid: string;
   supplierGuid: string;
   acquisitionDate: string;
   acquisitionCost: number;
-  currentBookValue?: number; // Optional - should not be sent in update requests
+  currentBookValue?: number;
   locationDetail: string;
   condition: string;
   status: string;
@@ -91,7 +94,16 @@ export interface UpdateAssetRequest {
   salvageValue: number;
   t24AssetReference: string;
   lastT24ValuationDate: string;
-  custodian: string;
+  custodianGuid: string;
+  oem?: string;
+  model?: string;
+  brand?: string;
+  operatingSystemVersion?: string;
+  releaseVersion?: string;
+  eolEoslDate?: string;
+  locationStatus?: string;
+  returnDate?: string;
+  collectionDate?: string;
 }
 
 export type UpdateAssetResponse = StandardApiResponse<Asset>;
@@ -100,9 +112,6 @@ export interface CreateAssetRequest {
   assetName: string;
   serialNumber: string;
   tagNumber: string;
-  brandName: string;
-  model: string;
-  osVersion?: string;
   categoryGuid: string;
   departmentGuid: string;
   branchGuid: string;
@@ -118,7 +127,44 @@ export interface CreateAssetRequest {
   salvageValue: number;
   t24AssetReference: string;
   lastT24ValuationDate: string;
-  custodian: string;
+  custodianGuid: string;
+  oem?: string;
+  model?: string;
+  brand?: string;
+  operatingSystemVersion?: string;
+  releaseVersion?: string;
+  eolEoslDate?: string;
+  locationStatus?: string;
+  returnDate?: string;
+  collectionDate?: string;
 }
 
 export type CreateAssetResponse = StandardApiResponse<Asset>;
+
+// Custodian History Types
+export interface CustodianUser {
+  guid: string;
+  emailAddress: string;
+  fullName: string;
+  displayName: string;
+  department: AssetDepartment;
+  branch: AssetBranch;
+}
+
+export interface CustodianHistoryRecord {
+  guid: string;
+  custodian: CustodianUser;
+  custodianName: string;
+  branch: AssetBranch;
+  department: AssetDepartment;
+  assignedAt: string;
+  assignedBy: CustodianUser;
+  notes: string;
+}
+
+export interface CustodianHistoryResponse {
+  responseCode: string;
+  responseMessage: string;
+  errors: string[];
+  responseData: CustodianHistoryRecord[];
+}

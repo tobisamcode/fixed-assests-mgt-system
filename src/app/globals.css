@@ -100,7 +100,6 @@
     display: none;  /* Safari and Chrome */
   }
   
-  /* Apply to all horizontal overflow containers */
   .overflow-x-auto {
     -ms-overflow-style: none;  /* Internet Explorer 10+ */
     scrollbar-width: none;  /* Firefox */
@@ -109,7 +108,6 @@
     display: none;  /* Safari and Chrome */
   }
 
-  /* Shimmer animation for skeleton loaders */
   @keyframes shimmer {
     0% {
       transform: translateX(-100%);

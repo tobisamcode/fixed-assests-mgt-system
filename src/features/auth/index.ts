@@ -5,3 +5,5 @@ export type {
   InitiateLoginResponse,
 } from "./services/api";
 export { useAuthorizeLogin } from "./services/mutation";
+export { useSessionManager } from "./useSessionManager";
+export { SessionProvider } from "./SessionProvider";

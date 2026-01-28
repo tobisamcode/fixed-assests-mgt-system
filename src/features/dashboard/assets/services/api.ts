@@ -7,6 +7,7 @@ import {
   CreateAssetResponse,
   AssetsQueryParams,
   AssetSingleResponse,
+  CustodianHistoryResponse,
 } from "../type";
 
 export const assetApi = {
@@ -31,6 +32,13 @@ export const assetApi = {
 
   getAssetByGuid: async (guid: string): Promise<AssetSingleResponse> => {
     const response = await req.get<AssetSingleResponse>(`/asset/asset/${guid}`);
+    return response.data;
+  },
+
+  getCustodianHistory: async (guid: string): Promise<CustodianHistoryResponse> => {
+    const response = await req.get<CustodianHistoryResponse>(
+      `/asset/asset/${guid}/custodian-history`
+    );
     return response.data;
   },
 };

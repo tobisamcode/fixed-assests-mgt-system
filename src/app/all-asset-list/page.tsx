@@ -46,9 +46,13 @@ import { assetStatuses } from "@/lib/dummy-data";
 import {
   useAssetsQuery,
   useAssetByGuidQuery,
+  useCustodianHistoryQuery,
 } from "@/features/dashboard/assets/services/queries";
 import { useUpdateAssetMutation } from "@/features/dashboard/assets/services/mutations";
-import { Asset as ApiAsset } from "@/features/dashboard/assets/type";
+import {
+  Asset as ApiAsset,
+  CustodianHistoryRecord,
+} from "@/features/dashboard/assets/type";
 import {
   exportToCSV,
   formatCurrencyForCSV,
@@ -70,7 +74,14 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
+  History,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   SearchableSelect,
@@ -95,9 +106,13 @@ interface Asset {
   tagNumber: string;
   assetName: string;
   serialNumber: string;
-  brandName: string;
+  brand: string;
   model: string;
-  osVersion?: string;
+  oem?: string;
+  operatingSystemVersion?: string;
+  releaseVersion?: string;
+  eolEoslDate?: string;
+  locationStatus?: string;
   categoryName: string;
   categoryDescription: string;
   departmentName: string;
@@ -116,7 +131,7 @@ interface Asset {
   depreciationMethod: string;
   status: "Active" | "Disabled" | "Disposed";
   condition: string;
-  custodian: string;
+  custodianGuid: string;
   location: string;
   depreciationStatus: "Current" | "Fully Depreciated" | "Partially Depreciated";
 }
@@ -144,7 +159,7 @@ export default function AllAssetListPage() {
     setContactSearchTerm(search);
   };
   const { data: contactsData, isLoading: contactsLoading } = useContactsQuery(
-    contactSearchTerm ? { search: contactSearchTerm } : undefined
+    contactSearchTerm ? { search: contactSearchTerm } : undefined,
   );
   const contacts = contactsData?.responseData?.records || [];
 
@@ -191,7 +206,7 @@ export default function AllAssetListPage() {
       value: contact.email,
       label: contact.name,
       description: `${contact.email} • ${contact.username}`,
-    })
+    }),
   );
 
   // Resource options for searchable selects
@@ -200,7 +215,7 @@ export default function AllAssetListPage() {
       value: category.guid,
       label: category.categoryName,
       description: category.description || "",
-    })
+    }),
   );
 
   const departmentOptions: SearchableSelectOption[] = departments.map(
@@ -208,7 +223,7 @@ export default function AllAssetListPage() {
       value: department.guid,
       label: department.departmentName,
       description: department.description || "",
-    })
+    }),
   );
 
   const branchOptions: SearchableSelectOption[] = branches.map(
@@ -216,7 +231,7 @@ export default function AllAssetListPage() {
       value: branch.guid,
       label: branch.branchName,
       description: branch.address || "",
-    })
+    }),
   );
 
   const supplierOptions: SearchableSelectOption[] = suppliers.map(
@@ -224,7 +239,7 @@ export default function AllAssetListPage() {
       value: supplier.guid,
       label: supplier.supplierName,
       description: `${supplier.contactPerson || ""} • ${supplier.email || ""}`,
-    })
+    }),
   );
 
   // API calls
@@ -234,6 +249,11 @@ export default function AllAssetListPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [viewAssetGuid, setViewAssetGuid] = useState<string | null>(null);
   const [editAssetGuid, setEditAssetGuid] = useState<string | null>(null);
+  const [custodianHistoryGuid, setCustodianHistoryGuid] = useState<
+    string | null
+  >(null);
+  const [custodianHistoryAssetName, setCustodianHistoryAssetName] =
+    useState<string>("");
 
   // Debounce search key to reduce API calls during typing
   useEffect(() => {
@@ -275,7 +295,7 @@ export default function AllAssetListPage() {
     (custodianName: string | undefined) =>
     (apiAsset: ApiAsset): Asset => {
       const mapStatus = (
-        s: string | undefined
+        s: string | undefined,
       ): "Active" | "Disabled" | "Disposed" => {
         switch ((s || "").toUpperCase()) {
           case "ACTIVE":
@@ -304,9 +324,13 @@ export default function AllAssetListPage() {
         tagNumber: apiAsset.tagNumber,
         assetName: apiAsset.assetName,
         serialNumber: apiAsset.serialNumber,
-        brandName: apiAsset.brandName || "",
+        brand: apiAsset.brand || "",
         model: apiAsset.model || "",
-        osVersion: apiAsset.osVersion || "",
+        oem: apiAsset.oem || "",
+        operatingSystemVersion: apiAsset.operatingSystemVersion || "",
+        releaseVersion: apiAsset.releaseVersion || "",
+        eolEoslDate: apiAsset.eolEoslDate || "",
+        locationStatus: apiAsset.locationStatus || "",
         categoryName: apiAsset.category?.categoryName || "",
         categoryDescription: apiAsset.category?.description || "",
         departmentName: apiAsset.department?.departmentName || "",
@@ -325,7 +349,7 @@ export default function AllAssetListPage() {
         depreciationMethod: apiAsset.depreciationMethod || "",
         status: mapStatus(apiAsset.status as unknown as string),
         condition: apiAsset.condition,
-        custodian: custodianName || "",
+        custodianGuid: apiAsset.custodianGuid || custodianName || "",
         location: apiAsset.locationDetail,
         depreciationStatus,
       };
@@ -342,16 +366,22 @@ export default function AllAssetListPage() {
   // Queries for modals (hooks must be at top level)
   const viewAssetQuery = useAssetByGuidQuery(viewAssetGuid || undefined);
   const editAssetQuery = useAssetByGuidQuery(editAssetGuid || undefined);
+  const custodianHistoryQuery = useCustodianHistoryQuery(
+    custodianHistoryGuid || undefined,
+  );
   const updateAssetMutation = useUpdateAssetMutation();
 
   // Initialize selected resource GUIDs when edit modal opens
   useEffect(() => {
     if (editAssetQuery.data?.responseData) {
       const asset = editAssetQuery.data.responseData;
-      setSelectedCategoryGuid(asset.categoryGuid || "");
-      setSelectedDepartmentGuid(asset.departmentGuid || "");
-      setSelectedBranchGuid(asset.branchGuid || "");
-      setSelectedSupplierGuid(asset.supplierGuid || "");
+      // Use categoryGuid or fall back to nested category.guid
+      setSelectedCategoryGuid(asset.categoryGuid || asset.category?.guid || "");
+      setSelectedDepartmentGuid(
+        asset.departmentGuid || asset.department?.guid || "",
+      );
+      setSelectedBranchGuid(asset.branchGuid || asset.branch?.guid || "");
+      setSelectedSupplierGuid(asset.supplierGuid || asset.supplier?.guid || "");
     }
   }, [editAssetQuery.data]);
 
@@ -550,7 +580,7 @@ export default function AllAssetListPage() {
             <Badge
               variant="secondary"
               className={`text-xs font-medium border ${getCategoryColor(
-                categoryName
+                categoryName,
               )} hover:shadow-sm transition-shadow duration-200`}
             >
               {categoryName}
@@ -772,14 +802,14 @@ export default function AllAssetListPage() {
                 status === "Active"
                   ? "bg-emerald-500"
                   : status === "Disabled"
-                  ? "bg-amber-500"
-                  : "bg-red-500"
+                    ? "bg-amber-500"
+                    : "bg-red-500"
               }`}
             />
             <Badge
               variant="secondary"
               className={`text-xs font-medium border ${getStatusStyle(
-                status
+                status,
               )} hover:shadow-md transition-all duration-200`}
             >
               {status}
@@ -795,47 +825,97 @@ export default function AllAssetListPage() {
         const asset = row.original;
 
         return (
-          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleViewAsset(asset)}
-              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-all duration-200"
-              title="View Details"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleEditAsset(asset)}
-              className="h-8 w-8 p-0 hover:bg-orange-50 hover:text-orange-600 rounded-full transition-all duration-200"
-              title="Edit Asset"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDisableAsset(asset)}
-              className="h-8 w-8 p-0 hover:bg-yellow-50 hover:text-yellow-600 rounded-full transition-all duration-200 disabled:opacity-30"
-              disabled={asset.status === "Disabled"}
-              title={
-                asset.status === "Disabled" ? "Asset Disabled" : "Disable Asset"
-              }
-            >
-              <Power className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemoveAsset(asset)}
-              className="h-8 w-8 p-0 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-full transition-all duration-200"
-              title="Remove Asset"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider delayDuration={100}>
+            <div className="flex items-center space-x-1 opacity-40 group-hover:opacity-100 transition-opacity duration-200">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewAsset(asset)}
+                    className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-all duration-200"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View Details</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditAsset(asset)}
+                    className="h-8 w-8 p-0 hover:bg-orange-50 hover:text-orange-600 rounded-full transition-all duration-200"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit Asset</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDisableAsset(asset)}
+                    className="h-8 w-8 p-0 hover:bg-yellow-50 hover:text-yellow-600 rounded-full transition-all duration-200 disabled:opacity-30"
+                    disabled={asset.status === "Disabled"}
+                  >
+                    <Power className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {asset.status === "Disabled"
+                      ? "Asset Disabled"
+                      : "Disable Asset"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setCustodianHistoryGuid(asset.id);
+                      setCustodianHistoryAssetName(asset.assetName);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-purple-50 hover:text-purple-600 rounded-full transition-all duration-200"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Custodian History</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveAsset(asset)}
+                    className="h-8 w-8 p-0 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-full transition-all duration-200"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Remove Asset</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         );
       },
     },
@@ -878,7 +958,6 @@ export default function AllAssetListPage() {
         asset.branchName,
         asset.categoryName,
         asset.supplierName,
-        asset.custodian,
       ];
 
       const query = String(value ?? "").toLowerCase();
@@ -887,7 +966,7 @@ export default function AllAssetListPage() {
       return searchableFields.some((field) =>
         String(field ?? "")
           .toLowerCase()
-          .includes(query)
+          .includes(query),
       );
     },
     state: {
@@ -1103,7 +1182,7 @@ export default function AllAssetListPage() {
                                 ? null
                                 : flexRender(
                                     header.column.columnDef.header,
-                                    header.getContext()
+                                    header.getContext(),
                                   )}
                             </TableHead>
                           );
@@ -1144,7 +1223,7 @@ export default function AllAssetListPage() {
                             >
                               {flexRender(
                                 cell.column.columnDef.cell,
-                                cell.getContext()
+                                cell.getContext(),
                               )}
                             </TableCell>
                           ))}
@@ -1255,7 +1334,7 @@ export default function AllAssetListPage() {
                       className="hidden h-9 w-9 p-0 lg:flex border-slate-200 hover:bg-slate-50 shadow-sm rounded-lg"
                       onClick={() =>
                         setPageNumber(
-                          assetsData?.responseData?.meta?.numberOfPages || 1
+                          assetsData?.responseData?.meta?.numberOfPages || 1,
                         )
                       }
                       disabled={
@@ -1304,19 +1383,49 @@ export default function AllAssetListPage() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Serial Number</div>
-                    <div className="font-medium">{asset.serialNumber || "N/A"}</div>
+                    <div className="font-medium">
+                      {asset.serialNumber || "N/A"}
+                    </div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">Brand Name</div>
-                    <div className="font-medium">{asset.brandName || "N/A"}</div>
+                    <div className="text-xs text-slate-500">Brand</div>
+                    <div className="font-medium">{asset.brand || "N/A"}</div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Model</div>
                     <div className="font-medium">{asset.model || "N/A"}</div>
                   </div>
                   <div>
+                    <div className="text-xs text-slate-500">OEM</div>
+                    <div className="font-medium">{asset.oem || "N/A"}</div>
+                  </div>
+                  <div>
                     <div className="text-xs text-slate-500">OS Version</div>
-                    <div className="font-medium">{asset.osVersion || "N/A"}</div>
+                    <div className="font-medium">
+                      {asset.operatingSystemVersion || "N/A"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Release Version
+                    </div>
+                    <div className="font-medium">
+                      {asset.releaseVersion || "N/A"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">EOL/EOSL Date</div>
+                    <div className="font-medium">
+                      {asset.eolEoslDate || "N/A"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500">
+                      Location Status
+                    </div>
+                    <div className="font-medium">
+                      {asset.locationStatus || "N/A"}
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500">Status</div>
@@ -1454,9 +1563,19 @@ export default function AllAssetListPage() {
               const nameRef = { current: null as HTMLInputElement | null };
               const serialRef = { current: null as HTMLInputElement | null };
               const tagRef = { current: null as HTMLInputElement | null };
-              const brandNameRef = { current: null as HTMLInputElement | null };
+              const brandRef = { current: null as HTMLInputElement | null };
               const modelRef = { current: null as HTMLInputElement | null };
+              const oemRef = { current: null as HTMLInputElement | null };
               const osVersionRef = { current: null as HTMLInputElement | null };
+              const releaseVersionRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const eolEoslDateRef = {
+                current: null as HTMLInputElement | null,
+              };
+              const locationStatusRef = {
+                current: null as HTMLSelectElement | null,
+              };
               const conditionRef = { current: null as HTMLInputElement | null };
               const statusRef = { current: null as HTMLInputElement | null };
               const acquisitionDateRef = {
@@ -1488,19 +1607,28 @@ export default function AllAssetListPage() {
                     serialNumber:
                       serialRef.current?.value || asset.serialNumber || "",
                     tagNumber: tagRef.current?.value || asset.tagNumber,
-                    brandName: brandNameRef.current?.value || asset.brandName,
-                    model: modelRef.current?.value || asset.model,
-                    osVersion: osVersionRef.current?.value || asset.osVersion || undefined,
-                    categoryGuid: selectedCategoryGuid || asset.categoryGuid,
+                    categoryGuid:
+                      selectedCategoryGuid ||
+                      asset.categoryGuid ||
+                      asset.category?.guid,
                     departmentGuid:
-                      selectedDepartmentGuid || asset.departmentGuid,
-                    branchGuid: selectedBranchGuid || asset.branchGuid,
-                    supplierGuid: selectedSupplierGuid || asset.supplierGuid,
+                      selectedDepartmentGuid ||
+                      asset.departmentGuid ||
+                      asset.department?.guid,
+                    branchGuid:
+                      selectedBranchGuid ||
+                      asset.branchGuid ||
+                      asset.branch?.guid,
+                    supplierGuid:
+                      selectedSupplierGuid ||
+                      asset.supplierGuid ||
+                      asset.supplier?.guid,
                     acquisitionDate:
                       acquisitionDateRef.current?.value ||
                       asset.acquisitionDate,
                     acquisitionCost: Number(
-                      acquisitionCostRef.current?.value ?? asset.acquisitionCost
+                      acquisitionCostRef.current?.value ??
+                        asset.acquisitionCost,
                     ),
                     locationDetail:
                       locationDetailRef.current?.value || asset.locationDetail,
@@ -1510,14 +1638,35 @@ export default function AllAssetListPage() {
                       depreciationMethodRef.current?.value ||
                       asset.depreciationMethod,
                     usefulLifeYears: Number(
-                      usefulLifeYearsRef.current?.value ?? asset.usefulLifeYears
+                      usefulLifeYearsRef.current?.value ??
+                        asset.usefulLifeYears,
                     ),
                     salvageValue: Number(
-                      salvageValueRef.current?.value ?? asset.salvageValue
+                      salvageValueRef.current?.value ?? asset.salvageValue,
                     ),
                     t24AssetReference: asset.t24AssetReference || "",
                     lastT24ValuationDate: asset.lastT24ValuationDate || "",
-                    custodian: selectedContact?.name || "",
+                    custodianGuid:
+                      selectedContact?.guid || asset.custodianGuid || "",
+                    oem: oemRef.current?.value || asset.oem || undefined,
+                    model: modelRef.current?.value || asset.model,
+                    brand: brandRef.current?.value || asset.brand,
+                    operatingSystemVersion:
+                      osVersionRef.current?.value ||
+                      asset.operatingSystemVersion ||
+                      undefined,
+                    releaseVersion:
+                      releaseVersionRef.current?.value ||
+                      asset.releaseVersion ||
+                      undefined,
+                    eolEoslDate:
+                      eolEoslDateRef.current?.value ||
+                      asset.eolEoslDate ||
+                      undefined,
+                    locationStatus:
+                      locationStatusRef.current?.value ||
+                      asset.locationStatus ||
+                      undefined,
                   });
                   if (updateAssetMutation.isSuccess) {
                     toast.success("Asset updated successfully");
@@ -1554,24 +1703,31 @@ export default function AllAssetListPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs text-slate-500 mb-1">
-                        Brand Name
-                      </div>
+                      <div className="text-xs text-slate-500 mb-1">Brand</div>
                       <input
-                        defaultValue={asset.brandName || ""}
-                        ref={brandNameRef}
-                        placeholder="Enter brand name"
+                        defaultValue={asset.brand || ""}
+                        ref={brandRef}
+                        placeholder="Enter brand"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">Model</div>
+                      <input
+                        defaultValue={asset.model || ""}
+                        ref={modelRef}
+                        placeholder="Enter model"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       />
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Model
+                        OEM (Optional)
                       </div>
                       <input
-                        defaultValue={asset.model || ""}
-                        ref={modelRef}
-                        placeholder="Enter model"
+                        defaultValue={asset.oem || ""}
+                        ref={oemRef}
+                        placeholder="Enter OEM"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       />
                     </div>
@@ -1591,11 +1747,47 @@ export default function AllAssetListPage() {
                         OS Version (Optional)
                       </div>
                       <input
-                        defaultValue={asset.osVersion || ""}
+                        defaultValue={asset.operatingSystemVersion || ""}
                         ref={osVersionRef}
                         placeholder="Enter OS version"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Release Version (Optional)
+                      </div>
+                      <input
+                        defaultValue={asset.releaseVersion || ""}
+                        ref={releaseVersionRef}
+                        placeholder="Enter release version"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        EOL/EOSL Date (Optional)
+                      </div>
+                      <input
+                        type="date"
+                        defaultValue={asset.eolEoslDate?.slice(0, 10) || ""}
+                        ref={eolEoslDateRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        Location Status
+                      </div>
+                      <select
+                        defaultValue={asset.locationStatus || ""}
+                        ref={locationStatusRef}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      >
+                        <option value="">Select location status</option>
+                        <option value="In storage">In storage</option>
+                        <option value="Not in storage">Not in storage</option>
+                      </select>
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
@@ -1779,7 +1971,7 @@ export default function AllAssetListPage() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Custodian
+                        Re assign Custodian
                       </div>
 
                       <SearchableSelect
@@ -1787,7 +1979,7 @@ export default function AllAssetListPage() {
                         value={selectedContact?.email || ""}
                         onValueChange={(value) => {
                           const contact = contacts.find(
-                            (c: Contact) => c.email === value
+                            (c: Contact) => c.email === value,
                           );
                           setSelectedContact(contact || null);
                         }}
@@ -1815,6 +2007,167 @@ export default function AllAssetListPage() {
             })()
           ) : (
             <div className="py-12 text-center text-slate-500">No data</div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Custodian History Modal */}
+      <Dialog
+        open={!!custodianHistoryGuid}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCustodianHistoryGuid(null);
+            setCustodianHistoryAssetName("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-gray-800">
+              Custodian History
+            </DialogTitle>
+            {custodianHistoryAssetName && (
+              <p className="text-sm text-slate-500 mt-1">
+                Asset:{" "}
+                <span className="font-medium text-slate-700">
+                  {custodianHistoryAssetName}
+                </span>
+              </p>
+            )}
+          </DialogHeader>
+          {custodianHistoryQuery.isLoading ? (
+            <div className="py-12 text-center text-slate-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              Loading custodian history…
+            </div>
+          ) : custodianHistoryQuery.data?.responseData &&
+            custodianHistoryQuery.data.responseData.length > 0 ? (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                        Custodian
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                        Department
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                        Branch
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                        Assigned At
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                        Assigned By
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                        Notes
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {custodianHistoryQuery.data.responseData.map(
+                      (record: CustodianHistoryRecord, index: number) => (
+                        <tr
+                          key={record.guid}
+                          className={`border-b border-slate-100 ${
+                            index === 0 ? "bg-purple-50" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-slate-900">
+                              {record.custodian?.fullName ||
+                                record.custodianName ||
+                                "N/A"}
+                            </div>
+                            {record.custodian?.emailAddress && (
+                              <div className="text-xs text-slate-500">
+                                {record.custodian.emailAddress}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-slate-700">
+                              {record.department?.departmentName ||
+                                record.custodian?.department?.departmentName ||
+                                "N/A"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-slate-700">
+                              {record.branch?.branchName ||
+                                record.custodian?.branch?.branchName ||
+                                "N/A"}
+                            </div>
+                            {(record.branch?.address ||
+                              record.custodian?.branch?.address) && (
+                              <div className="text-xs text-slate-500">
+                                {record.branch?.address ||
+                                  record.custodian?.branch?.address}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-slate-700">
+                              {record.assignedAt
+                                ? new Date(
+                                    record.assignedAt,
+                                  ).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "N/A"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-slate-700">
+                              {record.assignedBy?.fullName ||
+                                record.assignedBy?.displayName ||
+                                "N/A"}
+                            </div>
+                            {record.assignedBy?.emailAddress && (
+                              <div className="text-xs text-slate-500">
+                                {record.assignedBy.emailAddress}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div
+                              className="text-slate-600 max-w-[200px] truncate"
+                              title={record.notes || ""}
+                            >
+                              {record.notes || "-"}
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="text-xs text-slate-500 text-center pt-2">
+                Showing {custodianHistoryQuery.data.responseData.length}{" "}
+                record(s)
+                {custodianHistoryQuery.data.responseData.length > 0 && (
+                  <span className="ml-2">
+                    • Most recent assignment highlighted
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-slate-500">
+              <History className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+              <p className="font-medium">No custodian history found</p>
+              <p className="text-sm mt-1">
+                This asset has no recorded custodian assignments.
+              </p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
