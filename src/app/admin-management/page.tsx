@@ -227,9 +227,15 @@ export default function AdminManagementPage() {
         roleGuids: selectedRoles,
       };
 
-      await createUserMutation.mutateAsync(payload);
-      toast.success("User created successfully!");
-      closeCreateModal();
+      const response = await createUserMutation.mutateAsync(payload);
+      if (response.responseCode === "00") {
+        toast.success("User created successfully!");
+        closeCreateModal();
+      } else if (response.responseCode === "02") {
+        toast.error("User already exists. Please try again.");
+      } else {
+        toast.error("Failed to create user. Please try again.");
+      }
     } catch (error) {
       console.error("Error creating user:", error);
       toast.error("Failed to create user. Please try again.");
@@ -430,9 +436,15 @@ export default function AdminManagementPage() {
         permissionEnums: createRolePermissions,
       };
 
-      await createRoleMutation.mutateAsync(payload);
-      toast.success("Role created successfully!");
-      closeCreateRoleModal();
+      const response = await createRoleMutation.mutateAsync(payload);
+      if (response.responseCode === "00") {
+        toast.success("Role created successfully!");
+        closeCreateRoleModal();
+      } else if (response.responseCode === "02") {
+        toast.error("Role already exists. Please try again.");
+      } else {
+        toast.error("Failed to create role. Please try again.");
+      }
     } catch (error) {
       console.error("Error creating role:", error);
       toast.error("Failed to create role. Please try again.");
@@ -1094,11 +1106,21 @@ export default function AdminManagementPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-                <div className="text-sm text-gray-600">
-                  {selectedContact
-                    ? "Contact selected"
-                    : "Please select a contact"}{" "}
-                  • {selectedRoles.length} roles assigned
+                <div className="text-sm">
+                  {!selectedContact ? (
+                    <span className="text-amber-600 font-medium">
+                      ⚠ Please select a contact
+                    </span>
+                  ) : selectedRoles.length === 0 ? (
+                    <span className="text-amber-600 font-medium">
+                      ⚠ Please select at least one role
+                    </span>
+                  ) : (
+                    <span className="text-green-600 font-medium">
+                      ✓ Contact selected • {selectedRoles.length} role
+                      {selectedRoles.length > 1 ? "s" : ""} assigned
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center space-x-3">
                   <Button
@@ -1114,7 +1136,8 @@ export default function AdminManagementPage() {
                     disabled={
                       isSubmitting ||
                       createUserMutation.isPending ||
-                      !selectedContact
+                      !selectedContact ||
+                      selectedRoles.length === 0
                     }
                     className="px-6 bg-blue-600 text-white hover:bg-blue-700"
                   >

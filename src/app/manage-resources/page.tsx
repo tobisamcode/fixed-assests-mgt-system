@@ -667,7 +667,7 @@ export default function ManageResourcesPage() {
             {
               name: "contactNumber",
               label: "Contact Number",
-              type: "text",
+              type: "tel",
               required: true,
             },
             { name: "email", label: "Email", type: "email", required: true },
@@ -914,7 +914,30 @@ export default function ManageResourcesPage() {
                             message: "Invalid email address",
                           },
                         }),
+                        ...(field.name === "contactNumber" && {
+                          pattern: {
+                            value: /^[0-9]+$/,
+                            message: "Contact number must contain only digits",
+                          },
+                          maxLength: {
+                            value: 11,
+                            message: "Contact number cannot exceed 11 digits",
+                          },
+                          minLength: {
+                            value: 10,
+                            message:
+                              "Contact number must be at least 10 digits",
+                          },
+                        }),
                       })}
+                      onInput={(e) => {
+                        if (field.name === "contactNumber") {
+                          const target = e.target as HTMLInputElement;
+                          target.value = target.value
+                            .replace(/[^0-9]/g, "")
+                            .slice(0, 11);
+                        }
+                      }}
                     />
                     {errors[field.name] && (
                       <p className="text-xs text-red-600 flex items-center mt-1">
@@ -940,7 +963,15 @@ export default function ManageResourcesPage() {
             <div className="flex items-center justify-between pt-6 border-t border-gray-200">
               <div className="text-sm text-gray-600">
                 {editingItem ? "Updating existing" : "Creating new"}{" "}
-                {modalResourceType.slice(0, -1)}
+                {modalResourceType === "departments"
+                  ? "Department"
+                  : modalResourceType === "suppliers"
+                  ? "Supplier"
+                  : modalResourceType === "categories"
+                  ? "Category"
+                  : modalResourceType === "branches"
+                  ? "Branch"
+                  : ""}
               </div>
               <div className="flex items-center space-x-3">
                 <Button
@@ -972,8 +1003,15 @@ export default function ManageResourcesPage() {
                   ) : (
                     <>
                       {editingItem ? "Update" : "Create"}{" "}
-                      {modalResourceType.slice(0, -1).charAt(0).toUpperCase() +
-                        modalResourceType.slice(1, -1)}
+                      {modalResourceType === "departments"
+                        ? "Department"
+                        : modalResourceType === "suppliers"
+                        ? "Supplier"
+                        : modalResourceType === "categories"
+                        ? "Category"
+                        : modalResourceType === "branches"
+                        ? "Branch"
+                        : ""}
                     </>
                   )}
                 </Button>
