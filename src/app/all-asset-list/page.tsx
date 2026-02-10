@@ -132,6 +132,7 @@ interface Asset {
   status: "Active" | "Disabled" | "Disposed";
   condition: string;
   custodianGuid: string;
+  custodianName: string;
   location: string;
   depreciationStatus: "Current" | "Fully Depreciated" | "Partially Depreciated";
 }
@@ -154,6 +155,8 @@ export default function AllAssetListPage() {
     useState<string>("");
   const [selectedBranchGuid, setSelectedBranchGuid] = useState<string>("");
   const [selectedSupplierGuid, setSelectedSupplierGuid] = useState<string>("");
+  const [selectedCustodianGuid, setSelectedCustodianGuid] =
+    useState<string>("");
 
   const handleContactSearch = (search: string) => {
     setContactSearchTerm(search);
@@ -161,6 +164,7 @@ export default function AllAssetListPage() {
   const { data: contactsData, isLoading: contactsLoading } = useContactsQuery(
     contactSearchTerm ? { search: contactSearchTerm } : undefined,
   );
+
   const contacts = contactsData?.responseData?.records || [];
 
   // Queries for resources
@@ -349,7 +353,8 @@ export default function AllAssetListPage() {
         depreciationMethod: apiAsset.depreciationMethod || "",
         status: mapStatus(apiAsset.status as unknown as string),
         condition: apiAsset.condition,
-        custodianGuid: apiAsset.custodianGuid || custodianName || "",
+        custodianGuid: selectedCustodianGuid || "",
+        custodianName: apiAsset.custodianName || "",
         location: apiAsset.locationDetail,
         depreciationStatus,
       };
@@ -382,6 +387,7 @@ export default function AllAssetListPage() {
       );
       setSelectedBranchGuid(asset.branchGuid || asset.branch?.guid || "");
       setSelectedSupplierGuid(asset.supplierGuid || asset.supplier?.guid || "");
+      setSelectedCustodianGuid(asset.custodianGuid || "");
     }
   }, [editAssetQuery.data]);
 
@@ -521,12 +527,19 @@ export default function AllAssetListPage() {
         );
       },
       cell: ({ row }) => {
+        const assetName = row.getValue("assetName") as string;
         return (
-          <div className="max-w-[200px]">
-            <div className="font-semibold text-slate-900 mb-1">
-              {row.getValue("assetName")}
+          <div className="max-w-[200px] overflow-hidden">
+            <div
+              className="font-semibold text-slate-900 mb-1 truncate"
+              title={assetName}
+            >
+              {assetName}
             </div>
-            <div className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-full inline-block">
+            <div
+              className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-full inline-block max-w-full truncate"
+              title={row.original.serialNumber}
+            >
               {row.original.serialNumber}
             </div>
           </div>
@@ -576,17 +589,21 @@ export default function AllAssetListPage() {
           return "bg-slate-100 text-slate-800 border-slate-200";
         };
         return (
-          <div className="max-w-[200px]">
+          <div className="max-w-[200px] overflow-hidden">
             <Badge
               variant="secondary"
-              className={`text-xs font-medium border ${getCategoryColor(
+              className={`text-xs font-medium border max-w-full truncate ${getCategoryColor(
                 categoryName,
               )} hover:shadow-sm transition-shadow duration-200`}
+              title={categoryName}
             >
               {categoryName}
             </Badge>
             {categoryDescription && (
-              <div className="text-xs text-slate-500 mt-1 truncate">
+              <div
+                className="text-xs text-slate-500 mt-1 truncate"
+                title={categoryDescription}
+              >
                 {categoryDescription}
               </div>
             )}
@@ -618,10 +635,18 @@ export default function AllAssetListPage() {
         const departmentName = row.getValue("departmentName") as string;
         const departmentDescription = row.original.departmentDescription;
         return (
-          <div className="max-w-[180px]">
-            <div className="font-medium text-slate-900">{departmentName}</div>
+          <div className="max-w-[180px] overflow-hidden">
+            <div
+              className="font-medium text-slate-900 truncate"
+              title={departmentName}
+            >
+              {departmentName}
+            </div>
             {departmentDescription && (
-              <div className="text-xs text-slate-500 truncate">
+              <div
+                className="text-xs text-slate-500 truncate"
+                title={departmentDescription}
+              >
                 {departmentDescription}
               </div>
             )}
@@ -653,10 +678,18 @@ export default function AllAssetListPage() {
         const branchName = row.getValue("branchName") as string;
         const branchAddress = row.original.branchAddress;
         return (
-          <div className="max-w-[180px]">
-            <div className="font-medium text-slate-900">{branchName}</div>
+          <div className="max-w-[180px] overflow-hidden">
+            <div
+              className="font-medium text-slate-900 truncate"
+              title={branchName}
+            >
+              {branchName}
+            </div>
             {branchAddress && (
-              <div className="text-xs text-slate-500 truncate">
+              <div
+                className="text-xs text-slate-500 truncate"
+                title={branchAddress}
+              >
                 {branchAddress}
               </div>
             )}
@@ -665,7 +698,7 @@ export default function AllAssetListPage() {
       },
     },
     {
-      accessorKey: "supplierName",
+      accessorKey: "custodianName",
       header: ({ column }) => {
         return (
           <Button
@@ -673,7 +706,7 @@ export default function AllAssetListPage() {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 p-0 hover:bg-transparent"
           >
-            Supplier
+            Custodian
             {column.getIsSorted() === "asc" ? (
               <ArrowUp className="ml-2 h-4 w-4" />
             ) : column.getIsSorted() === "desc" ? (
@@ -685,28 +718,75 @@ export default function AllAssetListPage() {
         );
       },
       cell: ({ row }) => {
-        const supplierName = row.getValue("supplierName") as string;
-        const supplierContactPerson = row.original.supplierContactPerson;
-        const supplierContactNumber = row.original.supplierContactNumber;
-        const supplierEmail = row.original.supplierEmail;
+        const custodianName = row.getValue("custodianName") as string;
         return (
-          <div className="max-w-[220px]">
-            <div className="font-medium text-slate-900">{supplierName}</div>
-            {supplierContactPerson && (
-              <div className="text-xs text-slate-500 truncate">
-                {supplierContactPerson}
-              </div>
+          <div className="max-w-[180px] overflow-hidden">
+            <div
+              className="font-medium text-slate-900 truncate"
+              title={custodianName || "N/A"}
+            >
+              {custodianName || "N/A"}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "locationStatus",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 hover:bg-transparent"
+          >
+            Location Status
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
             )}
-            {supplierContactNumber && (
-              <div className="text-xs text-slate-500 truncate">
-                {supplierContactNumber}
-              </div>
-            )}
-            {supplierEmail && (
-              <div className="text-xs text-slate-400 truncate">
-                {supplierEmail}
-              </div>
-            )}
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const locationStatus = row.getValue("locationStatus") as string;
+        const labelMap: Record<string, string> = {
+          IN_STORAGE: "In Storage",
+          WITH_IT: "With IT",
+          IN_USE: "In Use",
+          IN_REPAIR: "In Repair",
+          DISPOSED: "Disposed",
+        };
+        const label = labelMap[locationStatus] || locationStatus || "N/A";
+        const getLocationStatusStyle = (status: string) => {
+          switch (status) {
+            case "IN_USE":
+              return "bg-emerald-100 text-emerald-800 border-emerald-200";
+            case "IN_STORAGE":
+              return "bg-blue-100 text-blue-800 border-blue-200";
+            case "WITH_IT":
+              return "bg-purple-100 text-purple-800 border-purple-200";
+            case "IN_REPAIR":
+              return "bg-amber-100 text-amber-800 border-amber-200";
+            case "DISPOSED":
+              return "bg-red-100 text-red-800 border-red-200";
+            default:
+              return "bg-slate-100 text-slate-800 border-slate-200";
+          }
+        };
+        return (
+          <div className="max-w-[150px]">
+            <Badge
+              variant="secondary"
+              className={`text-xs font-medium border ${getLocationStatusStyle(
+                locationStatus,
+              )} hover:shadow-sm transition-shadow duration-200`}
+            >
+              {label}
+            </Badge>
           </div>
         );
       },
@@ -1424,7 +1504,15 @@ export default function AllAssetListPage() {
                       Location Status
                     </div>
                     <div className="font-medium">
-                      {asset.locationStatus || "N/A"}
+                      {{
+                        IN_STORAGE: "In Storage",
+                        WITH_IT: "With IT",
+                        IN_USE: "In Use",
+                        IN_REPAIR: "In Repair",
+                        DISPOSED: "Disposed",
+                      }[asset.locationStatus || ""] ||
+                        asset.locationStatus ||
+                        "N/A"}
                     </div>
                   </div>
                   <div>
@@ -1647,7 +1735,7 @@ export default function AllAssetListPage() {
                     t24AssetReference: asset.t24AssetReference || "",
                     lastT24ValuationDate: asset.lastT24ValuationDate || "",
                     custodianGuid:
-                      selectedContact?.guid || asset.custodianGuid || "",
+                      selectedCustodianGuid || asset.custodianGuid || "",
                     oem: oemRef.current?.value || asset.oem || undefined,
                     model: modelRef.current?.value || asset.model,
                     brand: brandRef.current?.value || asset.brand,
@@ -1668,11 +1756,7 @@ export default function AllAssetListPage() {
                       asset.locationStatus ||
                       undefined,
                   });
-                  if (updateAssetMutation.isSuccess) {
-                    toast.success("Asset updated successfully");
-                  } else {
-                    toast.error("Failed to update asset");
-                  }
+                  toast.success("Asset updated successfully");
                   setEditAssetGuid(null);
                 } catch {
                   toast.error("Failed to update asset");
@@ -1785,8 +1869,11 @@ export default function AllAssetListPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       >
                         <option value="">Select location status</option>
-                        <option value="In storage">In storage</option>
-                        <option value="Not in storage">Not in storage</option>
+                        <option value="IN_STORAGE">In Storage</option>
+                        <option value="WITH_IT">With IT</option>
+                        <option value="IN_USE">In Use</option>
+                        <option value="IN_REPAIR">In Repair</option>
+                        <option value="DISPOSED">Disposed</option>
                       </select>
                     </div>
                     <div>
@@ -1981,7 +2068,12 @@ export default function AllAssetListPage() {
                           const contact = contacts.find(
                             (c: Contact) => c.email === value,
                           );
+                          // console.log(
+                          //   "Selected contact object:",
+                          //   JSON.stringify(contact, null, 2),
+                          // );
                           setSelectedContact(contact || null);
+                          setSelectedCustodianGuid(contact?.email || "");
                         }}
                         onSearchChange={handleContactSearch}
                         placeholder="Search and select a contact..."
@@ -2021,7 +2113,7 @@ export default function AllAssetListPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto bg-white">
+        <DialogContent className="sm:max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-gray-800">
               Custodian History
@@ -2138,7 +2230,7 @@ export default function AllAssetListPage() {
                           </td>
                           <td className="py-3 px-4">
                             <div
-                              className="text-slate-600 max-w-[200px] truncate"
+                              className="text-slate-600 max-w-[200px] "
                               title={record.notes || ""}
                             >
                               {record.notes || "-"}
