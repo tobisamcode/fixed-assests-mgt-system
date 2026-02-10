@@ -116,7 +116,7 @@ export default function AdminManagementPage() {
   const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
   const [createRolePermissions, setCreateRolePermissions] = useState<string[]>(
-    []
+    [],
   );
   const [isDeactivateUserModalOpen, setIsDeactivateUserModalOpen] =
     useState(false);
@@ -124,7 +124,7 @@ export default function AdminManagementPage() {
     useState<User | null>(null);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(
-    null
+    null,
   );
   const [editDepartmentGuid, setEditDepartmentGuid] = useState<string>("");
   const [editRoleNames, setEditRoleNames] = useState<string[]>([]);
@@ -155,10 +155,10 @@ export default function AdminManagementPage() {
   });
   const { data: departmentsData, isLoading: departmentsLoading } =
     useDepartmentsQuery(
-      departmentSearchTerm ? { searchKey: departmentSearchTerm } : undefined
+      departmentSearchTerm ? { searchKey: departmentSearchTerm } : undefined,
     );
   const { data: contactsData, isLoading: contactsLoading } = useContactsQuery(
-    contactSearchTerm ? { search: contactSearchTerm } : undefined
+    contactSearchTerm ? { search: contactSearchTerm } : undefined,
   );
   const { data: platformRolesData, isLoading: platformRolesLoading } =
     usePlatformRolesQuery();
@@ -255,7 +255,7 @@ export default function AdminManagementPage() {
       value: dept.guid,
       label: dept.departmentName,
       description: dept.description || undefined,
-    })
+    }),
   );
 
   // Prepare contact options for searchable select
@@ -264,7 +264,7 @@ export default function AdminManagementPage() {
       value: contact.email,
       label: contact.name,
       description: `${contact.email} • ${contact.username}`,
-    })
+    }),
   );
 
   const handleContactSearch = (search: string) => {
@@ -275,7 +275,7 @@ export default function AdminManagementPage() {
     setSelectedRoles((prev) =>
       prev.includes(roleGuid)
         ? prev.filter((id) => id !== roleGuid)
-        : [...prev, roleGuid]
+        : [...prev, roleGuid],
     );
   };
 
@@ -286,7 +286,7 @@ export default function AdminManagementPage() {
 
   const handleEditRole = async (
     role: PlatformRole,
-    event: React.MouseEvent
+    event: React.MouseEvent,
   ) => {
     event.stopPropagation();
     setSelectedRoleForEdit(role);
@@ -326,7 +326,7 @@ export default function AdminManagementPage() {
     setEditRoleNames((prev) =>
       prev.includes(roleGuid)
         ? prev.filter((r) => r !== roleGuid)
-        : [...prev, roleGuid]
+        : [...prev, roleGuid],
     );
   };
 
@@ -384,7 +384,7 @@ export default function AdminManagementPage() {
     setEditingPermissions((prev) =>
       prev.includes(permissionName)
         ? prev.filter((p) => p !== permissionName)
-        : [...prev, permissionName]
+        : [...prev, permissionName],
     );
   };
 
@@ -398,8 +398,8 @@ export default function AdminManagementPage() {
       });
       toast.success(
         `Successfully updated permissions for ${formatText(
-          selectedRoleForEdit.name
-        )}`
+          selectedRoleForEdit.name,
+        )}`,
       );
       closeEditRoleModal();
     } catch (error) {
@@ -424,7 +424,7 @@ export default function AdminManagementPage() {
     setCreateRolePermissions((prev) =>
       prev.includes(permissionName)
         ? prev.filter((p) => p !== permissionName)
-        : [...prev, permissionName]
+        : [...prev, permissionName],
     );
   };
 
@@ -456,7 +456,7 @@ export default function AdminManagementPage() {
     (user: User) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
+      user.username.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -706,7 +706,7 @@ export default function AdminManagementPage() {
                                   "text-xs font-medium",
                                   user.status === "ACTIVE"
                                     ? "text-green-600"
-                                    : "text-red-600"
+                                    : "text-red-600",
                                 )}
                               >
                                 {user.status}
@@ -882,9 +882,9 @@ export default function AdminManagementPage() {
                               usersMeta
                                 ? Math.min(
                                     usersMeta.numberOfPages || p + 1,
-                                    p + 1
+                                    p + 1,
                                   )
-                                : p + 1
+                                : p + 1,
                             )
                           }
                         >
@@ -947,7 +947,7 @@ export default function AdminManagementPage() {
                     value={selectedContact?.email || ""}
                     onValueChange={(value) => {
                       const contact = contacts.find(
-                        (c: Contact) => c.email === value
+                        (c: Contact) => c.email === value,
                       );
                       setSelectedContact(contact || null);
                     }}
@@ -1460,7 +1460,7 @@ export default function AdminManagementPage() {
                                     </div>
                                   </div>
                                 </div>
-                              )
+                              ),
                             )}
                           </div>
                         ) : (
@@ -1573,7 +1573,7 @@ export default function AdminManagementPage() {
                           {allPermissions
                             .filter(
                               (permission) =>
-                                !editingPermissions.includes(permission.name)
+                                !editingPermissions.includes(permission.name),
                             )
                             .map((permission: Permission) => (
                               <div
@@ -1616,7 +1616,7 @@ export default function AdminManagementPage() {
                               </div>
                             ))}
                           {allPermissions.filter(
-                            (p) => !editingPermissions.includes(p.name)
+                            (p) => !editingPermissions.includes(p.name),
                           ).length === 0 && (
                             <div className="p-8 text-center">
                               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -1666,7 +1666,7 @@ export default function AdminManagementPage() {
                         <div className="divide-y divide-gray-100">
                           {editingPermissions.map((permissionName: string) => {
                             const permission = allPermissions.find(
-                              (p) => p.name === permissionName
+                              (p) => p.name === permissionName,
                             );
                             return (
                               <div
@@ -1864,11 +1864,11 @@ export default function AdminManagementPage() {
                             <div className="flex items-start space-x-3">
                               <Checkbox
                                 checked={createRolePermissions.includes(
-                                  permission.name
+                                  permission.name,
                                 )}
                                 onCheckedChange={() =>
                                   handleCreateRolePermissionToggle(
-                                    permission.name
+                                    permission.name,
                                   )
                                 }
                               />
@@ -1876,7 +1876,7 @@ export default function AdminManagementPage() {
                                 <h4
                                   className={`font-medium text-sm transition-colors ${
                                     createRolePermissions.includes(
-                                      permission.name
+                                      permission.name,
                                     )
                                       ? "text-green-700"
                                       : "text-gray-900 group-hover:text-green-700"
