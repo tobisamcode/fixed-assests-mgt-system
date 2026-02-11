@@ -388,6 +388,10 @@ export default function AllAssetListPage() {
       setSelectedBranchGuid(asset.branchGuid || asset.branch?.guid || "");
       setSelectedSupplierGuid(asset.supplierGuid || asset.supplier?.guid || "");
       setSelectedCustodianGuid(asset.custodianGuid || "");
+      // Pre-fill custodian search so the current custodian appears in options
+      if (asset.custodianName) {
+        setContactSearchTerm(asset.custodianName);
+      }
     }
   }, [editAssetQuery.data]);
 
@@ -2060,18 +2064,18 @@ export default function AllAssetListPage() {
                       <div className="text-xs text-slate-500 mb-1">
                         Re assign Custodian
                       </div>
-
+                      {asset.custodianName && (
+                        <div className="text-sm font-medium text-slate-700 mb-2 px-3 py-2 bg-slate-50 rounded-md border border-slate-200">
+                          Current: {asset.custodianName}
+                        </div>
+                      )}
                       <SearchableSelect
                         options={contactOptions}
-                        value={selectedContact?.email || ""}
+                        value={selectedCustodianGuid}
                         onValueChange={(value) => {
                           const contact = contacts.find(
                             (c: Contact) => c.email === value,
                           );
-                          // console.log(
-                          //   "Selected contact object:",
-                          //   JSON.stringify(contact, null, 2),
-                          // );
                           setSelectedContact(contact || null);
                           setSelectedCustodianGuid(contact?.email || "");
                         }}
