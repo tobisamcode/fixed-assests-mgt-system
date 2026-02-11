@@ -53,6 +53,7 @@ export interface Asset {
   t24AssetReference: string;
   lastT24ValuationDate: string;
   custodianGuid: string;
+  custodianName?: string;
   oem?: string;
   model?: string;
   brand?: string;

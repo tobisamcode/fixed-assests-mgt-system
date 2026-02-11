@@ -210,7 +210,7 @@ export default function RegisterNewAssetPage() {
       salvageValue: data.salvageValue,
       t24AssetReference: "",
       lastT24ValuationDate: "",
-      custodianGuid: selectedContact?.guid || "",
+      custodianGuid: selectedContact?.email || "",
       oem: data.oem || undefined,
       model: data.model || undefined,
       brand: data.brand || undefined,
@@ -428,11 +428,12 @@ export default function RegisterNewAssetPage() {
 
                   <FormField
                     label="Serial Number"
-                    placeholder="Enter serial number (optional)"
+                    placeholder="Enter serial number"
                     error={errors.serialNumber}
                     touched={touchedFields.serialNumber}
+                    required
                     {...register("serialNumber")}
-                    description="Optional serial number for identification"
+                    description="Unique serial number for identification"
                   />
                 </div>
 
@@ -479,14 +480,15 @@ export default function RegisterNewAssetPage() {
                         <SelectValue placeholder="Select location status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="In storage">In storage</SelectItem>
-                        <SelectItem value="Not in storage">
-                          Not in storage
-                        </SelectItem>
+                        <SelectItem value="IN_STORAGE">In Storage</SelectItem>
+                        <SelectItem value="WITH_IT">With IT</SelectItem>
+                        <SelectItem value="IN_USE">In Use</SelectItem>
+                        <SelectItem value="IN_REPAIR">In Repair</SelectItem>
+                        <SelectItem value="DISPOSED">Disposed</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-gray-500">
-                      Asset storage status
+                      Asset location status
                     </p>
                   </div>
                 </div>
@@ -815,6 +817,11 @@ export default function RegisterNewAssetPage() {
                     loading={contactsLoading}
                     clearable={true}
                   />
+                  {selectedContact && (
+                    <p className="text-xs text-gray-500">
+                      Selected: {selectedContact.name} ({selectedContact.email})
+                    </p>
+                  )}
                   {errors.custodian && (
                     <p className="text-xs text-red-600 flex items-center mt-1">
                       <AlertCircle className="w-3 h-3 mr-1" />

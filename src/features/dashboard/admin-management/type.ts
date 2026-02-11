@@ -91,7 +91,7 @@ export interface PlatformRole {
       description: string;
       requireChecker: boolean;
       noOfCheckerRequired: number;
-    }
+    },
   ];
 }
 

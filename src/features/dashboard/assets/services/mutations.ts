@@ -13,6 +13,9 @@ export const useUpdateAssetMutation = () => {
         queryClient.invalidateQueries({
           queryKey: ["asset", variables?.guid],
         });
+        queryClient.invalidateQueries({
+          queryKey: ["custodian-history", variables?.guid],
+        });
       }
     },
   });

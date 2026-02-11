@@ -52,13 +52,12 @@ export const assetSchema = z
 
     serialNumber: z
       .string()
+      .min(1, "Serial number is required")
       .max(50, "Serial number must not exceed 50 characters")
       .regex(
-        /^[A-Z0-9-_]*$/i,
+        /^[A-Z0-9-_]+$/i,
         "Serial number can only contain letters, numbers, hyphens, and underscores"
-      )
-      .optional()
-      .or(z.literal("")),
+      ),
 
     tagNumber: z
       .string()

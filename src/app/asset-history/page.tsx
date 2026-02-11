@@ -58,7 +58,6 @@ import {
   Calendar,
   Activity,
   XCircle,
-  Eye,
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -424,30 +423,6 @@ export default function AssetHistoryPage() {
         );
       },
     },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const record = row.original;
-
-        return (
-          <div className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleViewHistoryDetail(record);
-              }}
-              className="h-9 w-9 p-0 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:text-blue-600 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md border border-transparent hover:border-blue-200"
-              title="View Audit Log Details"
-            >
-              <Eye className="h-4.5 w-4.5" />
-            </Button>
-          </div>
-        );
-      },
-    },
   ];
 
   const table = useReactTable({
@@ -774,17 +749,6 @@ export default function AssetHistoryPage() {
                             </div>
                           </TableCell>
 
-                          {/* Actions Column */}
-                          <TableCell className="py-4 px-6 last:pr-8">
-                            <div className="flex items-center justify-center">
-                              <div className="relative h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-br from-blue-100/40 via-indigo-50/60 to-blue-100/40 backdrop-blur-sm shadow-sm">
-                                <div
-                                  className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/70 to-transparent"
-                                  style={{ animationDelay: "400ms" }}
-                                />
-                              </div>
-                            </div>
-                          </TableCell>
                         </TableRow>
                       ))
                     ) : isError ? (
