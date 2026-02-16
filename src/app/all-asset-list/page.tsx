@@ -1692,12 +1692,17 @@ export default function AllAssetListPage() {
                 current: null as HTMLInputElement | null,
               };
               const handleSave = async () => {
+                const serialValue = serialRef.current?.value?.trim();
+                if (!serialValue) {
+                  toast.error("Serial number is required");
+                  serialRef.current?.focus();
+                  return;
+                }
                 try {
                   await updateAssetMutation.mutateAsync({
                     guid: asset.guid,
                     assetName: nameRef.current?.value || asset.assetName,
-                    serialNumber:
-                      serialRef.current?.value || asset.serialNumber || "",
+                    serialNumber: serialValue,
                     tagNumber: tagRef.current?.value || asset.tagNumber,
                     categoryGuid:
                       selectedCategoryGuid ||
@@ -1821,11 +1826,12 @@ export default function AllAssetListPage() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        Serial Number (Optional)
+                        Serial Number <span className="text-red-500">*</span>
                       </div>
                       <input
                         defaultValue={asset.serialNumber || ""}
                         ref={serialRef}
+                        required
                         placeholder="Enter serial number"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       />
