@@ -988,14 +988,14 @@ export default function AllAssetListPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleRemoveAsset(asset)}
-                    className="h-8 w-8 p-0 hover:bg-red-50 text-red-500 hover:text-red-600 rounded-full transition-all duration-200"
+                    disabled
+                    className="h-8 w-8 p-0 text-red-300 rounded-full transition-all duration-200 cursor-not-allowed opacity-40"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Remove Asset</p>
+                  <p>Delete is disabled</p>
                 </TooltipContent>
               </Tooltip>
             </div>
