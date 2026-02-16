@@ -456,7 +456,7 @@ export default function AllAssetListPage() {
         { key: "depreciationMethod", header: "Depreciation Method" },
         { key: "status", header: "Status" },
         { key: "condition", header: "Condition" },
-        { key: "custodian", header: "Custodian" },
+        { key: "custodianName", header: "Custodian" },
         { key: "location", header: "Location" },
         { key: "depreciationStatus", header: "Depreciation Status" },
       ];
