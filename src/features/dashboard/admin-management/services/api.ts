@@ -18,6 +18,7 @@ import {
   UpdatePlatformUserResponse,
   DeactivatePlatformUserPayload,
   DeactivatePlatformUserResponse,
+  PlatformUserDetailResponse,
 } from "@/features/dashboard/admin-management/type";
 
 export const adminApi = {
@@ -32,7 +33,7 @@ export const adminApi = {
   },
 
   getContacts: async (
-    params?: ContactsQueryParams
+    params?: ContactsQueryParams,
   ): Promise<ContactsResponse> => {
     const response = await req.get("/admin-mgt/contacts", { params });
     return response.data;
@@ -49,17 +50,17 @@ export const adminApi = {
   },
 
   updateRolePermissions: async (
-    payload: UpdateRolePermissionsPayload
+    payload: UpdateRolePermissionsPayload,
   ): Promise<UpdateRolePermissionsResponse> => {
     const response = await req.put(
       "/auth-mgt/platform-role/permissions",
-      payload
+      payload,
     );
     return response.data;
   },
 
   getRolePermissions: async (
-    params: RolePermissionsQueryParams
+    params: RolePermissionsQueryParams,
   ): Promise<RolePermissionsResponse> => {
     const response = await req.get("/auth-mgt/platform-role/permissions", {
       params,
@@ -68,26 +69,33 @@ export const adminApi = {
   },
 
   createRole: async (
-    payload: CreateRolePayload
+    payload: CreateRolePayload,
   ): Promise<CreateRoleResponse> => {
     const response = await req.post(
       "/auth-mgt/platform-role/permissions",
-      payload
+      payload,
     );
     return response.data;
   },
 
   updatePlatformUser: async (
-    payload: UpdatePlatformUserPayload
+    payload: UpdatePlatformUserPayload,
   ): Promise<UpdatePlatformUserResponse> => {
     const response = await req.patch("/admin-mgt/update", payload);
     return response.data;
   },
 
   deactivatePlatformUser: async (
-    payload: DeactivatePlatformUserPayload
+    payload: DeactivatePlatformUserPayload,
   ): Promise<DeactivatePlatformUserResponse> => {
     const response = await req.patch("/admin-mgt/deactivate", payload);
+    return response.data;
+  },
+
+  getPlatformUserByGuid: async (
+    guid: string,
+  ): Promise<PlatformUserDetailResponse> => {
+    const response = await req.get(`/auth-mgt/platform-user/${guid}`);
     return response.data;
   },
 };

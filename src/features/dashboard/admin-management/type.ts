@@ -14,8 +14,17 @@ interface Meta {
   numberOfPages: number;
 }
 
-// User record structure
+// Role item within a user's rolesAndPermissions array
+export interface UserRole {
+  guid: string;
+  name: string;
+  users?: number | null;
+  description?: string;
+}
+
+// User record structure (list view may include guid for fetching full details)
 export interface User {
+  guid?: string;
   username: string;
   email: string;
   firstName: string;
@@ -23,6 +32,10 @@ export interface User {
   lastName: string;
   name: string;
   status: "ACTIVE" | "DEACTIVATED" | string;
+  createdAt?: string;
+  created_at?: string;
+  roles?: string[];
+  rolesAndPermissions?: UserRole[];
 }
 
 // Query parameters for getting users
@@ -172,4 +185,50 @@ export interface DeactivatePlatformUserPayload {
 
 export interface DeactivatePlatformUserResponse extends BaseResponse {
   responseData?: User;
+}
+
+// Platform user full detail (GET /auth-mgt/platform-user/{guid})
+export interface PlatformUserDetailDepartment {
+  guid: string;
+  departmentName: string;
+  description: string;
+}
+
+export interface PlatformUserDetailRole {
+  guid: string;
+  name: string;
+  users: number;
+  description: string;
+  permissions?: Permission[];
+}
+
+export interface PlatformUserDetailAuditUser {
+  guid: string;
+  emailAddress: string;
+  fullName: string;
+}
+
+export interface PlatformUserDetail {
+  guid: string;
+  emailAddress: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  fullName: string;
+  username: string;
+  displayName: string;
+  status: string;
+  deactivationReason?: string;
+  department?: PlatformUserDetailDepartment;
+  rolesAndPermissions?: PlatformUserDetailRole[];
+  createdAt?: string;
+  updatedAt?: string;
+  deactivatedAt?: string;
+  createdBy?: PlatformUserDetailAuditUser;
+  updatedBy?: PlatformUserDetailAuditUser;
+  deactivatedBy?: PlatformUserDetailAuditUser;
+}
+
+export interface PlatformUserDetailResponse extends BaseResponse {
+  responseData?: PlatformUserDetail;
 }

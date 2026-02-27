@@ -58,6 +58,7 @@ import {
   useCreateUserMutation,
   useContactsQuery,
   usePlatformRolesQuery,
+  usePlatformUserByGuidQuery,
   useAllPermissionsQuery,
   useUpdateRolePermissionsMutation,
   useRolePermissionsQuery,
@@ -168,6 +169,10 @@ export default function AdminManagementPage() {
     useRolePermissionsQuery({
       roleGuid: selectedRoleForDetails?.guid || "",
     });
+
+  const platformUserDetailQuery = usePlatformUserByGuidQuery(
+    selectedUserForEdit?.guid,
+  );
 
   // Mutations
   const createUserMutation = useCreateUserMutation();
@@ -314,6 +319,20 @@ export default function AdminManagementPage() {
     setEditDepartmentGuid("");
     setEditRoleNames([]);
   };
+
+  // Pre-fill edit modal when platform user detail is loaded
+  useEffect(() => {
+    if (!isEditUserModalOpen || !selectedUserForEdit) return;
+    const data = platformUserDetailQuery.data?.responseData;
+    if (
+      data &&
+      (data.guid === selectedUserForEdit.guid ||
+        data.emailAddress === selectedUserForEdit.email)
+    ) {
+      setEditDepartmentGuid(data.department?.guid ?? "");
+      setEditRoleNames(data.rolesAndPermissions?.map((r) => r.guid) ?? []);
+    }
+  }, [isEditUserModalOpen, selectedUserForEdit, platformUserDetailQuery.data]);
 
   const closeEditUserModal = () => {
     setIsEditUserModalOpen(false);
@@ -650,6 +669,12 @@ export default function AdminManagementPage() {
                         <TableHead className="font-semibold text-gray-700 py-4 px-6">
                           Status
                         </TableHead>
+                        <TableHead className="font-semibold text-gray-700 py-4 px-6">
+                          Created At
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700 py-4 px-6 max-w-[600px] w-[600px]">
+                          Roles
+                        </TableHead>
                         <TableHead className="font-semibold text-gray-700 py-4 px-6 text-center">
                           Actions
                         </TableHead>
@@ -659,7 +684,7 @@ export default function AdminManagementPage() {
                       {filteredUsers.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={4}
+                            colSpan={7}
                             className="text-center py-16 bg-gray-50/50"
                           >
                             <div className="flex flex-col items-center space-y-4">
@@ -711,6 +736,51 @@ export default function AdminManagementPage() {
                               >
                                 {user.status}
                               </p>
+                            </TableCell>
+                            <TableCell className="text-gray-600 py-4 px-6 text-sm">
+                              {(() => {
+                                const dateStr =
+                                  user.createdAt ?? user.created_at;
+                                return dateStr
+                                  ? new Date(dateStr).toLocaleDateString(
+                                      "en-US",
+                                      {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )
+                                  : "—";
+                              })()}
+                            </TableCell>
+                            <TableCell className="text-gray-600 py-4 px-6 max-w-[600px]">
+                              {(() => {
+                                const roles = user.rolesAndPermissions ?? [];
+                                if (roles.length === 0) {
+                                  return (
+                                    <span className="text-gray-400">—</span>
+                                  );
+                                }
+                                const descriptions = roles
+                                  .map((r) => r.description?.trim())
+                                  .filter(Boolean);
+                                const text =
+                                  descriptions.length > 0
+                                    ? descriptions.join(" | ")
+                                    : roles
+                                        .map((r) => formatText(r.name))
+                                        .join(" | ");
+                                return (
+                                  <span
+                                    className="text-sm whitespace-normal break-words "
+                                    title={text}
+                                  >
+                                    {text}
+                                  </span>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="py-4 px-6">
                               {user.status === "ACTIVE" && (
@@ -1225,11 +1295,30 @@ export default function AdminManagementPage() {
                   </label>
                   <input
                     type="text"
-                    value={selectedUserForEdit.email}
+                    value={
+                      platformUserDetailQuery.data?.responseData
+                        ?.emailAddress ?? selectedUserForEdit.email
+                    }
                     readOnly
                     className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700"
                   />
                 </div>
+
+                {!selectedUserForEdit.guid ? (
+                  <p className="text-amber-600 text-sm">
+                    User guid not available; department and roles could not be
+                    loaded. Please select them manually.
+                  </p>
+                ) : platformUserDetailQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-gray-600 font-medium">
+                        Loading user details...
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Department Selection */}
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
