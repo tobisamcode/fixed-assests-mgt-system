@@ -15,6 +15,16 @@ export const useUsersQuery = (params?: UsersQueryParams) => {
   });
 };
 
+export const usePlatformUserByGuidQuery = (guid: string | undefined) => {
+  return useQuery({
+    queryKey: ["platformUser", guid],
+    queryFn: () => adminApi.getPlatformUserByGuid(guid!),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    enabled: !!guid,
+  });
+};
+
 export const useContactsQuery = (params?: ContactsQueryParams) => {
   return useQuery({
     queryKey: ["contacts", params],
