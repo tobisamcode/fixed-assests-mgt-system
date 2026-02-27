@@ -9,7 +9,7 @@ export const loginSchema = z.object({
     .max(50, "Username must not exceed 50 characters")
     .regex(
       /^[a-zA-Z0-9_.-]+$/,
-      "Username can only contain letters, numbers, dots, hyphens, and underscores"
+      "Username can only contain letters, numbers, dots, hyphens, and underscores",
     ),
 
   password: z
@@ -31,7 +31,7 @@ export const strongPasswordSchema = z
   .regex(/[0-9]/, "Password must contain at least one number")
   .regex(
     /[^a-zA-Z0-9]/,
-    "Password must contain at least one special character"
+    "Password must contain at least one special character",
   );
 
 // Email validation schema
@@ -56,7 +56,7 @@ export const assetSchema = z
       .max(50, "Serial number must not exceed 50 characters")
       .regex(
         /^[A-Z0-9-_]+$/i,
-        "Serial number can only contain letters, numbers, hyphens, and underscores"
+        "Serial number can only contain letters, numbers, hyphens, and underscores",
       ),
 
     tagNumber: z
@@ -66,7 +66,7 @@ export const assetSchema = z
       .max(50, "Tag number must not exceed 50 characters")
       .regex(
         /^[A-Z0-9-_]+$/i,
-        "Tag number can only contain letters, numbers, hyphens, and underscores"
+        "Tag number can only contain letters, numbers, hyphens, and underscores",
       ),
 
     brand: z
@@ -99,15 +99,9 @@ export const assetSchema = z
       .optional()
       .or(z.literal("")),
 
-    eolEoslDate: z
-      .string()
-      .optional()
-      .or(z.literal("")),
+    eolEoslDate: z.string().optional().or(z.literal("")),
 
-    locationStatus: z
-      .string()
-      .optional()
-      .or(z.literal("")),
+    locationStatus: z.string().optional().or(z.literal("")),
 
     assetCategory: z.string().min(1, "Asset category is required"),
 
@@ -158,7 +152,7 @@ export const assetSchema = z
       ],
       {
         required_error: "Please select depreciation method",
-      }
+      },
     ),
 
     usefulLife: z
@@ -182,7 +176,7 @@ export const assetSchema = z
       .max(100, "Custodian name must not exceed 100 characters")
       .regex(
         /^[a-zA-Z\s'.-]+$/,
-        "Custodian name can only contain letters, spaces, apostrophes, dots, and hyphens"
+        "Custodian name can only contain letters, spaces, apostrophes, dots, and hyphens",
       ),
   })
   .refine(
@@ -196,7 +190,7 @@ export const assetSchema = z
     {
       message: "Warranty end date must be after start date",
       path: ["warrantyEnd"],
-    }
+    },
   )
   .refine(
     (data) => {
@@ -206,7 +200,7 @@ export const assetSchema = z
     {
       message: "Salvage value must be less than acquisition cost",
       path: ["salvageValue"],
-    }
+    },
   );
 
 // User registration schema (for future use)
@@ -219,7 +213,7 @@ export const userRegistrationSchema = z
       .max(50, "First name must not exceed 50 characters")
       .regex(
         /^[a-zA-Z\s'.-]+$/,
-        "First name can only contain letters, spaces, apostrophes, dots, and hyphens"
+        "First name can only contain letters, spaces, apostrophes, dots, and hyphens",
       ),
 
     lastName: z
@@ -229,7 +223,7 @@ export const userRegistrationSchema = z
       .max(50, "Last name must not exceed 50 characters")
       .regex(
         /^[a-zA-Z\s'.-]+$/,
-        "Last name can only contain letters, spaces, apostrophes, dots, and hyphens"
+        "Last name can only contain letters, spaces, apostrophes, dots, and hyphens",
       ),
 
     email: emailSchema,
@@ -313,7 +307,7 @@ export const searchSchema = z
     {
       message: "From date must be before or equal to To date",
       path: ["dateTo"],
-    }
+    },
   );
 
 // Type exports for TypeScript
