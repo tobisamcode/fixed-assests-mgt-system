@@ -56,6 +56,7 @@ export const useUpdatePlatformUserMutation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["platformRoles"] });
+      queryClient.invalidateQueries({ queryKey: ["platformUser"] });
     },
   });
 };
