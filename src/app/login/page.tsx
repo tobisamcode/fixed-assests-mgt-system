@@ -6,11 +6,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
 import { Shield, Zap, Package } from "lucide-react";
 import { toast } from "sonner";
+import { config } from "@/lib/config";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
-
-  const ZOHO_ACCOUNTS = "https://accounts.zoho.com";
 
   function generateUUID() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -23,7 +22,7 @@ export default function LoginPage() {
         const r = (Math.random() * 16) | 0;
         const v = c === "x" ? r : (r & 0x3) | 0x8;
         return v.toString(16);
-      }
+      },
     );
   }
 
@@ -31,28 +30,29 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
 
-      const clientId = process.env.NEXT_PUBLIC_ZOHO_CLIENT_ID;
+      const clientId = config.services.zoho.clientId;
+      const envLabel = config.env.isProduction ? "PROD" : "DEV";
 
       if (!clientId) {
-        console.error("NEXT_PUBLIC_ZOHO_CLIENT_ID is not configured");
+        console.error(
+          `Zoho client ID for ${envLabel} environment is not configured`,
+        );
         toast.error("Configuration Error", {
-          description:
-            "Zoho client ID is not configured. Please contact administrator.",
+          description: `Zoho client ID is missing for ${envLabel}. Please contact administrator.`,
         });
         setIsLoading(false);
         return;
       }
 
-      // Use environment variable for redirect URI if available, otherwise use current origin
       const redirectUri =
-        process.env.NEXT_PUBLIC_ZOHO_REDIRECT_URI ||
+        config.services.zoho.redirectUri ||
         `${window.location.origin}/verify-email`;
       const scope = ["AaaServer.profile.READ", "ZohoCRM.users.READ"].join(" ");
       const state = generateUUID();
 
       sessionStorage.setItem("zoho_oauth_state", state);
 
-      const url = new URL(`${ZOHO_ACCOUNTS}/oauth/v2/auth`);
+      const url = new URL(`${config.services.zoho.accountsUrl}/oauth/v2/auth`);
       url.searchParams.set("scope", scope);
       url.searchParams.set("client_id", clientId);
       url.searchParams.set("response_type", "code");
@@ -61,12 +61,13 @@ export default function LoginPage() {
       url.searchParams.set("state", state);
 
       console.log("Zoho OAuth Configuration:");
+      console.log("- Environment:", envLabel);
       console.log("- Client ID:", clientId);
       console.log("- Redirect URI:", redirectUri);
       console.log("- Current Origin:", window.location.origin);
       console.log(
         "- Environment Redirect URI:",
-        process.env.NEXT_PUBLIC_ZOHO_REDIRECT_URI
+        config.services.zoho.redirectUri,
       );
       console.log("Full OAuth URL:", url.toString());
       window.location.href = url.toString();
