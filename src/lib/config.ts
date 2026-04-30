@@ -19,6 +19,18 @@ export const config = {
     googleAnalytics: {
       id: process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID,
     },
+    zoho: {
+      clientId:
+        process.env.NODE_ENV === "production"
+          ? process.env.NEXT_PUBLIC_ZOHO_CLIENT_ID_PROD
+          : process.env.NEXT_PUBLIC_ZOHO_CLIENT_ID_DEV,
+      clientSecret:
+        process.env.NODE_ENV === "production"
+          ? process.env.ZOHO_CLIENT_SECRET_PROD
+          : process.env.ZOHO_CLIENT_SECRET_DEV,
+      redirectUri: process.env.NEXT_PUBLIC_ZOHO_REDIRECT_URI,
+      accountsUrl: "https://accounts.zoho.com",
+    },
   },
 
   database: {
@@ -59,7 +71,7 @@ export function validateEnv(): void {
 
   if (missingVars.length > 0) {
     throw new Error(
-      `Missing required environment variables: ${missingVars.join(", ")}`
+      `Missing required environment variables: ${missingVars.join(", ")}`,
     );
   }
 }
