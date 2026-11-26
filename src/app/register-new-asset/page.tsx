@@ -176,7 +176,7 @@ export default function RegisterNewAssetPage() {
       depreciationMethod: "straight-line" as const,
       usefulLife: 5,
       salvageValue: 0,
-      // custodian: "",
+      custodian: "",
     },
     mode: "onChange",
   });
@@ -210,7 +210,9 @@ export default function RegisterNewAssetPage() {
       salvageValue: data.salvageValue,
       t24AssetReference: "",
       lastT24ValuationDate: "",
-      custodianGuid: selectedContact?.email || "",
+      ...(selectedContact?.email
+        ? { custodianGuid: selectedContact.email }
+        : {}),
       oem: data.oem || undefined,
       model: data.model || undefined,
       brand: data.brand || undefined,
@@ -788,8 +790,8 @@ export default function RegisterNewAssetPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium required">
-                    Custodian <span className="text-red-500">*</span>
+                  <Label htmlFor="custodian" className="text-sm font-medium">
+                    Custodian
                   </Label>
                   <SearchableSelect
                     options={contactOptions}

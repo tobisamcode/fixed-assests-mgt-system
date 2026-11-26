@@ -95,7 +95,7 @@ export interface UpdateAssetRequest {
   salvageValue: number;
   t24AssetReference: string;
   lastT24ValuationDate: string;
-  custodianGuid: string;
+  custodianGuid?: string;
   oem?: string;
   model?: string;
   brand?: string;
@@ -128,7 +128,7 @@ export interface CreateAssetRequest {
   salvageValue: number;
   t24AssetReference: string;
   lastT24ValuationDate: string;
-  custodianGuid: string;
+  custodianGuid?: string;
   oem?: string;
   model?: string;
   brand?: string;

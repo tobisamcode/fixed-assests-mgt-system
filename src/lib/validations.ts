@@ -169,15 +169,7 @@ export const assetSchema = z
         return !decimalPart || decimalPart.length <= 2;
       }, "Salvage value can only have up to 2 decimal places"),
 
-    custodian: z
-      .string()
-      .min(1, "Custodian is required")
-      .min(2, "Custodian name must be at least 2 characters")
-      .max(100, "Custodian name must not exceed 100 characters")
-      .regex(
-        /^[a-zA-Z\s'.-]+$/,
-        "Custodian name can only contain letters, spaces, apostrophes, dots, and hyphens",
-      ),
+    custodian: z.string().optional().or(z.literal("")),
   })
   .refine(
     (data) => {
